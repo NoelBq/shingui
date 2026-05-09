@@ -5,7 +5,7 @@ export function SiteFooter() {
         <div className="flex items-center gap-2">
           <span className="kanji-mark text-(--accent)">真偽</span>
           <span>
-            Shingi — verifiable reputation for AI crypto trading agents · Solana devnet
+            Shingi — tamper-proof memory for autonomous AI agents · Solana devnet
           </span>
         </div>
         <div className="flex items-center gap-4">

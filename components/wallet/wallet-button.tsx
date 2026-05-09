@@ -11,6 +11,9 @@ export function WalletButton() {
   const { setVisible } = useWalletModal();
   const [mounted, setMounted] = useState(false);
 
+  // SSR hydration guard. Wallet adapter state is non-deterministic until
+  // after mount, so the first paint renders a placeholder.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), []);
 
   if (!mounted) {

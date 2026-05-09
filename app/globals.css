@@ -75,3 +75,61 @@ body {
 .shingi-pulse {
   animation: shingi-pulse 2.4s ease-in-out infinite;
 }
+
+/* ----- View Transitions ----- */
+
+:root {
+  --vt-duration-exit: 220ms;
+  --vt-duration-enter: 320ms;
+  --vt-duration-move: 420ms;
+}
+
+@keyframes vt-fade {
+  from { filter: blur(4px); opacity: 0; }
+  to { filter: blur(0); opacity: 1; }
+}
+
+@keyframes vt-scale-in {
+  from { transform: scale(0.96); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes vt-scale-out {
+  from { transform: scale(1); opacity: 1; }
+  to { transform: scale(0.96); opacity: 0; }
+}
+
+/* The status banner morph: green ✅ → red ❌ after a tamper.
+   Uses a longer duration so the flip lands as a clear demo beat. */
+::view-transition-group(.verify-status-flip) {
+  animation-duration: var(--vt-duration-move);
+}
+
+::view-transition-old(.verify-status-flip) {
+  animation: var(--vt-duration-exit) ease-in both vt-scale-out;
+}
+
+::view-transition-new(.verify-status-flip) {
+  animation: var(--vt-duration-enter) ease-out var(--vt-duration-exit) both vt-scale-in;
+}
+
+/* Tamper-diff banner enter — slides in from the top after a tamper. */
+::view-transition-new(.tamper-diff-enter) {
+  animation:
+    var(--vt-duration-enter) ease-out both vt-fade,
+    var(--vt-duration-move) cubic-bezier(0.2, 0.8, 0.2, 1) both tamper-diff-slide;
+}
+
+@keyframes tamper-diff-slide {
+  from { transform: translateY(-12px); }
+  to { transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}

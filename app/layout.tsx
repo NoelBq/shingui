@@ -16,9 +16,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Shingi — 真偽 · Trust layer for AI trading agents",
+  title: "Shingi — 真偽 · Tamper-proof memory for AI agents",
   description:
-    "Verifiable on-chain reputation for AI crypto trading agents. Browse agents, see prediction history, stake on confidence.",
+    "Hash-anchored audit trail for autonomous AI agents on Solana. Verify that an agent's recorded memory hasn't been edited since it was committed onchain.",
 };
 
 export default function RootLayout({

@@ -1,83 +1,50 @@
-export type AssetSymbol = "SOL/USD" | "BTC/USD" | "ETH/USD";
-export type Direction = "up" | "down";
-export type StakeSide = "agree" | "disagree";
-export type PredictionStatus = "pending" | "resolved" | "cancelled";
-export type ClaimStatus = "open" | "won" | "lost" | "claimed";
-
-export type Tier =
-  | "Untested"
-  | "Emerging"
-  | "Reliable"
-  | "Trusted"
-  | "Elite";
-
 export interface Agent {
   id: string;
   name: string;
   slug: string;
   description: string | null;
   avatar_url: string | null;
-  strategy_summary: string | null;
   owner_wallet: string;
   agent_pda: string | null;
   created_at: string;
 }
 
-export interface Prediction {
+// A memory event is a single thought / observation / decision an agent
+// records. The full payload lives in Postgres for fast retrieval; the
+// integrity guarantee comes from `solana_tx_sig` pointing at the onchain
+// commit of sha256(canonicalJson(payload)).
+//
+// The hash is intentionally NOT stored on this row. The verifier always
+// recomputes from `payload` at verify time — a stored hash would just be
+// another field the operator can edit.
+export interface MemoryEvent {
   id: string;
   agent_id: string;
-  asset: AssetSymbol;
-  side: Direction;
-  entry_price: number;
-  target_price: number | null;
-  deadline: string;
-  status: PredictionStatus;
-  outcome: boolean | null;
-  oracle_price: number | null;
-  prediction_pda: string | null;
-  prediction_hash: string | null;
-  resolved_at: string | null;
+  payload: MemoryPayload;
+  solana_tx_sig: string;
   created_at: string;
 }
 
-export interface Stake {
-  id: string;
-  staker_wallet: string;
-  agent_id: string;
-  prediction_id: string;
-  amount_lamports: number;
-  side: StakeSide;
-  tx_signature: string;
-  claim_status: ClaimStatus;
-  created_at: string;
+// Loose shape — agents can record arbitrary JSON. The known fields are
+// optional conveniences for the verify UI and the demo's tamper button.
+export interface MemoryPayload {
+  content?: string;
+  // Agent's self-reported timestamp. Compared against onchain block_time
+  // at verify time to flag backdating.
+  recorded_at?: string;
+  // Demo-friendly numeric field the tamper button mutates.
+  confidence?: number;
+  [key: string]: unknown;
 }
 
-export interface TrustComponents {
-  accuracy: number;
-  volume: number;
-  recency: number;
-  stake: number;
-}
-
-export interface TrustScore {
-  agent_id: string;
-  score: number;
-  tier: Tier;
-  accuracy_30d: number;
-  total_predictions: number;
-  correct_predictions: number;
-  total_stake_lamports: number;
-  components: TrustComponents;
-  computed_at: string;
-}
-
-export interface ScoreHistoryPoint {
-  agent_id: string;
-  score: number;
-  snapshot_at: string;
-}
-
-export interface AgentWithScore extends Agent {
-  trust_score: TrustScore | null;
-  total_stake_lamports: number;
+export interface VerifyResult {
+  ok: boolean;
+  computedHash: string;
+  onchainHash: string | null;
+  blockTime: number | null;
+  signer: string | null;
+  txSig: string;
+  // Set when the agent's self-reported `recorded_at` is meaningfully
+  // different from the onchain block_time.
+  timestampDivergenceSeconds: number | null;
 }

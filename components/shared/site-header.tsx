@@ -1,10 +1,7 @@
 import Link from "next/link";
 import { WalletButton } from "@/components/wallet/wallet-button";
 
-const NAV = [
-  { href: "/agents", label: "Agents" },
-  { href: "/leaderboard", label: "Leaderboard" },
-];
+const NAV: { href: string; label: string }[] = [];
 
 export function SiteHeader() {
   return (
