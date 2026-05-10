@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { commitMemoryServer } from "@/lib/memory/commit";
+import { PublicKey } from "@solana/web3.js";
+import { prepareCommitMemoryTx } from "@/lib/memory/commit";
 import { getRpcConnection } from "@/lib/memory/connection";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 const MEMORIES: Array<{
   agentSlug: string;
-  payload: { content: string; confidence: number; recorded_at: string };
+  payload: { content: string; confidence: number };
 }> = [
   {
     agentSlug: "hayato-momentum",
@@ -13,7 +14,6 @@ const MEMORIES: Array<{
       content:
         "SOL/USD broke above 4h descending trendline at 162.40 on rising volume. Updating bias to long.",
       confidence: 0.78,
-      recorded_at: new Date().toISOString(),
     },
   },
   {
@@ -22,7 +22,6 @@ const MEMORIES: Array<{
       content:
         "Pulled back to 158.10, held the breakout retest. Strengthens the long thesis.",
       confidence: 0.83,
-      recorded_at: new Date().toISOString(),
     },
   },
   {
@@ -31,7 +30,6 @@ const MEMORIES: Array<{
       content:
         "Closed half on first leg up at 168.20. Trailing stop on remainder at 161.",
       confidence: 0.7,
-      recorded_at: new Date().toISOString(),
     },
   },
   {
@@ -40,7 +38,6 @@ const MEMORIES: Array<{
       content:
         "1h RSI(14) on SOL crossed above 70. Mean-reversion short setup forming; waiting for divergence confirmation.",
       confidence: 0.62,
-      recorded_at: new Date().toISOString(),
     },
   },
   {
@@ -49,7 +46,6 @@ const MEMORIES: Array<{
       content:
         "Bearish RSI divergence printed on the latest 1h close. Entered short at 167.95 with stop above 170.",
       confidence: 0.74,
-      recorded_at: new Date().toISOString(),
     },
   },
   {
@@ -58,12 +54,31 @@ const MEMORIES: Array<{
       content:
         "Reversion target hit at 162.40. Closed full size. Logged outcome for retrospective.",
       confidence: 0.81,
-      recorded_at: new Date().toISOString(),
     },
   },
 ];
 
-export async function POST() {
+export async function POST(req: Request) {
+  let body: { feePayer?: string };
+  try {
+    body = (await req.json()) as { feePayer?: string };
+  } catch {
+    return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
+  }
+  const feePayerStr = body.feePayer?.trim();
+  if (!feePayerStr) {
+    return NextResponse.json({ error: "feePayer is required" }, { status: 400 });
+  }
+  let feePayer: PublicKey;
+  try {
+    feePayer = new PublicKey(feePayerStr);
+  } catch {
+    return NextResponse.json(
+      { error: "feePayer is not a valid base58 pubkey" },
+      { status: 400 },
+    );
+  }
+
   const sb = getServiceSupabase();
   if (!sb) {
     return NextResponse.json(
@@ -84,7 +99,6 @@ export async function POST() {
     return NextResponse.json(
       {
         error: `expected agents ${slugs.join(", ")}; run supabase/seed.sql first`,
-        found: agents?.map((a) => a.slug) ?? [],
       },
       { status: 400 },
     );
@@ -94,33 +108,36 @@ export async function POST() {
   );
 
   const connection = getRpcConnection();
+  const recordedAt = new Date().toISOString();
 
-  const committed: Array<{
-    memoryEventId: string;
-    txSig: string;
-    agent: string;
+  const prepared: Array<{
+    agentId: string;
+    agentSlug: string;
+    payload: { content: string; confidence: number; recorded_at: string };
+    partialTxBase64: string;
+    expectedHashHex: string;
+    agentPubkey: string;
   }> = [];
 
-  try {
-    for (const m of MEMORIES) {
-      const agentId = agentBySlug.get(m.agentSlug);
-      if (!agentId) continue;
-      const result = await commitMemoryServer({
-        connection,
-        agentId,
-        payload: m.payload,
-      });
-      committed.push({ ...result, agent: m.agentSlug });
-    }
-  } catch (e) {
-    return NextResponse.json(
-      {
-        error: e instanceof Error ? e.message : "commit failed",
-        committed_so_far: committed,
-      },
-      { status: 500 },
-    );
+  for (const m of MEMORIES) {
+    const agentId = agentBySlug.get(m.agentSlug);
+    if (!agentId) continue;
+    const payload = { ...m.payload, recorded_at: recordedAt };
+    const out = await prepareCommitMemoryTx({
+      connection,
+      agentId,
+      payload,
+      feePayer,
+    });
+    prepared.push({
+      agentId,
+      agentSlug: m.agentSlug,
+      payload,
+      partialTxBase64: out.partialTxBase64,
+      expectedHashHex: out.expectedHashHex,
+      agentPubkey: out.agentPubkey,
+    });
   }
 
-  return NextResponse.json({ ok: true, committed });
+  return NextResponse.json({ ok: true, prepared });
 }
