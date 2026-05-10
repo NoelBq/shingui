@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ViewTransition } from "react";
 import { explorerTxUrl, verifyMemory } from "@/lib/memory/verify";
 import { TamperButton } from "./tamper-button";
+import { RestoreButton } from "./restore-button";
 import { StatusBanner } from "@/components/verify/status-banner";
 import { DiffCard } from "@/components/verify/diff-card";
 import { MetaGrid } from "@/components/verify/meta-grid";
@@ -73,25 +74,34 @@ export default async function VerifyPage({
         </ViewTransition>
 
         {variant === "tampered" && tamperDiff ? (
-          <div className="mt-7 grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <DiffCard
-              title="Recomputed (live payload)"
-              variant="live"
-              hash={`0x${computedHash.slice(0, 12)}…${computedHash.slice(-10)}`}
-              hashLabel="(mismatch)"
-              fields={buildDiffFields(event.payload, tamperDiff, "live")}
-            />
-            <DiffCard
-              title="Onchain commit"
-              variant="onchain"
-              hash={
-                onchainHash
-                  ? `0x${onchainHash.slice(0, 12)}…${onchainHash.slice(-10)}`
-                  : "—"
-              }
-              fields={buildDiffFields(event.payload, tamperDiff, "onchain")}
-            />
-          </div>
+          <>
+            <div className="mt-7 grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <DiffCard
+                title="Recomputed (live payload)"
+                variant="live"
+                hash={`0x${computedHash.slice(0, 12)}…${computedHash.slice(-10)}`}
+                hashLabel="(mismatch)"
+                fields={buildDiffFields(event.payload, tamperDiff, "live")}
+              />
+              <DiffCard
+                title="Onchain commit"
+                variant="onchain"
+                hash={
+                  onchainHash
+                    ? `0x${onchainHash.slice(0, 12)}…${onchainHash.slice(-10)}`
+                    : "—"
+                }
+                fields={buildDiffFields(event.payload, tamperDiff, "onchain")}
+              />
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <RestoreButton memoryEventId={event.id} />
+              <span className="text-xs text-(--muted)">
+                Copies the original payload back into Postgres. The next
+                verify will be ✓.
+              </span>
+            </div>
+          </>
         ) : (
           <section className="mt-7 rounded-2xl border border-(--border) bg-(--surface)/60 p-5">
             <h2 className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-(--muted)">
@@ -101,10 +111,15 @@ export default async function VerifyPage({
 {JSON.stringify(event.payload, null, 2)}
             </pre>
             <div className="mt-4 flex flex-wrap items-center gap-3">
-              <TamperButton memoryEventId={event.id} />
+              {variant === "tampered" ? (
+                <RestoreButton memoryEventId={event.id} />
+              ) : (
+                <TamperButton memoryEventId={event.id} />
+              )}
               <span className="text-xs text-(--muted)">
-                Mutates payload.confidence in Postgres. Onchain commit is
-                untouched. The next verify will mismatch.
+                {variant === "tampered"
+                  ? "Copies the original payload back into Postgres. The next verify will be ✓."
+                  : "Mutates payload.confidence in Postgres. Onchain commit is untouched. The next verify will mismatch."}
               </span>
             </div>
           </section>

@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { getServerSupabase, getServiceSupabase } from "@/lib/supabase/server";
 import { SeedMemoriesButton } from "@/components/shared/seed-memories-button";
+import { ProvisionAgentsButton } from "@/components/shared/provision-agents-button";
+import { ResetMemoriesButton } from "@/components/shared/reset-memories-button";
+import { CreateAgentForm } from "@/components/shared/create-agent-form";
 import { VerificationCard } from "@/components/hero/verification-card";
 import { MemoryTable } from "@/components/memory/memory-table";
 import type { MemoryEvent } from "@/types";
@@ -117,8 +120,11 @@ export default async function LandingPage({ searchParams }: LandingPageProps) {
               </a>
             </div>
             {adminEnabled ? (
-              <div className="mt-6">
+              <div className="mt-6 flex flex-wrap items-start gap-3">
+                <ProvisionAgentsButton />
+                <ResetMemoriesButton />
                 <SeedMemoriesButton />
+                <CreateAgentForm />
               </div>
             ) : null}
             <div className="mt-12 flex flex-wrap items-center gap-5 font-mono text-[11px] uppercase tracking-[0.2em] text-(--muted)">

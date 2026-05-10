@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { PublicKey } from "@solana/web3.js";
 import { commitMemoryServer } from "@/lib/memory/commit";
-import { getRpcConnection, loadAdminKeypair } from "@/lib/memory/connection";
+import { getRpcConnection } from "@/lib/memory/connection";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 // Six memory events across two themed agents. Real shape would come from
@@ -75,11 +74,10 @@ export async function POST() {
     );
   }
 
-  // Resolve agents and bail early if the seed agents aren't in the table.
   const slugs = Array.from(new Set(MEMORIES.map((m) => m.agentSlug)));
   const { data: agents, error: agentsErr } = await sb
     .from("agents")
-    .select("id, slug, owner_wallet")
+    .select("id, slug")
     .in("slug", slugs);
   if (agentsErr) {
     return NextResponse.json({ error: agentsErr.message }, { status: 500 });
@@ -93,43 +91,37 @@ export async function POST() {
       { status: 400 },
     );
   }
-  const agentBySlug = new Map(agents.map((a) => [a.slug, a]));
+  const agentBySlug = new Map(
+    agents.map((a) => [a.slug as string, a.id as string]),
+  );
 
-  let connection: ReturnType<typeof getRpcConnection>;
-  let signer: ReturnType<typeof loadAdminKeypair>;
+  const connection = getRpcConnection();
+
+  const committed: Array<{
+    memoryEventId: string;
+    txSig: string;
+    agent: string;
+  }> = [];
+
   try {
-    connection = getRpcConnection();
-    signer = loadAdminKeypair();
+    for (const m of MEMORIES) {
+      const agentId = agentBySlug.get(m.agentSlug);
+      if (!agentId) continue;
+      const result = await commitMemoryServer({
+        connection,
+        agentId,
+        payload: m.payload,
+      });
+      committed.push({ ...result, agent: m.agentSlug });
+    }
   } catch (e) {
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : "config error" },
+      {
+        error: e instanceof Error ? e.message : "commit failed",
+        committed_so_far: committed,
+      },
       { status: 500 },
     );
-  }
-
-  const committed: Array<{ memoryEventId: string; txSig: string; agent: string }> = [];
-
-  for (const m of MEMORIES) {
-    const agent = agentBySlug.get(m.agentSlug);
-    if (!agent) continue; // already validated above
-    let agentPubkey: PublicKey;
-    try {
-      agentPubkey = new PublicKey(agent.owner_wallet);
-    } catch {
-      // The seed agents have placeholder owner_wallets; in that case we
-      // use the admin signer as the agent identity for the demo. This
-      // only matters for what gets recorded as `agent` in the onchain
-      // instruction data — the integrity check is unaffected.
-      agentPubkey = signer.publicKey;
-    }
-    const result = await commitMemoryServer({
-      connection,
-      signer,
-      agentId: agent.id as string,
-      agentPubkey,
-      payload: m.payload,
-    });
-    committed.push({ ...result, agent: agent.slug as string });
   }
 
   return NextResponse.json({ ok: true, committed });
