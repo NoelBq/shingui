@@ -58,24 +58,32 @@ Most of the demo is public — no API key, no admin flag needed:
 | View an agent's profile            | `/agents/[slug]`             | Public                                          |
 | Use MCP read tools                 | Claude Code, no API key      | `verify_memory`, `list_memories`, `get_memory`  |
 
-Admin actions (provision, reset, seed, create new agent, MCP `commit_memory`) are gated. The visitor experience is "watch tamper-proof memory in action," not "build the system from scratch."
+Admin actions (provision, fund, seed, create, rotate, wipe, MCP `commit_memory`) are gated. The visitor experience is "watch tamper-proof memory in action," not "build the system from scratch."
 
 ## Demo flow
 
-When admin is enabled (`NEXT_PUBLIC_SHINGI_ADMIN_ENABLED=true`), the landing page exposes three admin buttons:
+When admin is enabled (`NEXT_PUBLIC_SHINGI_ADMIN_ENABLED=true`) and a wallet is connected, the landing page exposes six admin buttons (constructive on the left, destructive on the right):
 
-1. **Provision agents** — for each seeded agent missing credentials, generates a Solana keypair (`agents.secret_key`), requests a 0.5 SOL devnet airdrop into it, and issues an MCP API key (`agents.api_key_hash` + `agents.api_key_prefix`). Idempotent at the column level — only fills in what's missing. Plaintext API keys are revealed **once** in the response panel; copy them then. Any agents whose airdrop failed surface in `funding_pending` so you can fund them manually.
-2. **Reset memories** — wipes the `memory_events` table. Onchain commits stay; only the Postgres pointer table is cleared. Useful between demo recordings.
-3. **Seed memories** — commits 6 memory events to devnet. Each tx has two signers: the agent (co-signed server-side, proves agent identity) and your connected wallet (pays the gas). Per-tx wallet popups confirm. Each row also stores `original_payload` so restore stays available. Requires a wallet to be connected.
+1. **Provision agents** — for each seeded agent missing credentials, generates a Solana keypair (`agents.secret_key` + `agents.owner_wallet`) and an MCP API key (`agents.api_key_hash` + `agents.api_key_prefix`). Idempotent — only fills in what's missing. Plaintext API keys are revealed **once** in the response panel; copy them then. Funding is handled separately by **Fund agents**.
+2. **Fund agents** — scans every agent, finds those with balance below 0.01 SOL, builds a single multi-instruction `SystemProgram.transfer` tx (one transfer per low agent, up to 16 per signature), tops each to 0.05 SOL. Paid by the **connected wallet**. One wallet popup, all agents funded.
+3. **Seed memories** — commits 6 memory events to devnet. Each tx has two signers: the agent (co-signed server-side, proves agent identity) and your connected wallet (pays the gas). Per-tx wallet popups confirm. Each row also stores `original_payload` so restore stays available.
+4. **Create new agent** — spins up a fresh agent (DB row + keypair + API key) then immediately prompts the connected wallet to send 0.05 SOL to its new pubkey. The credentials panel reveals the API key + the funding tx link (Solscan). One flow, agent ready for MCP commits in seconds.
+5. **Rotate API keys** *(destructive)* — clears `api_key_hash` + `api_key_prefix` for every agent. Old plaintext bearer tokens stop authenticating immediately. Pairs with **Provision agents** to issue fresh keys. Does NOT affect keypairs, memories, or onchain identity.
+6. **Wipe memory rows** *(destructive)* — deletes all rows from `memory_events`. Onchain commits stay; only the Postgres pointer table clears. Useful between demo recordings.
+
+Per-agent profile pages (`/agents/<slug>`) also display:
+- Live wallet balance (with **low** amber warning when < 0.01 SOL)
+- A **Fund 0.05 SOL** button that tops up just that one agent
+
+The Recent memories table on `/` shows each agent's current balance under its name (with the same amber low-warning).
 
 Then the verify loop:
 
-4. Click any memory in the **Recent memories** list → `/verify/[id]`.
-
-5. Status banner shows ✅ **Verified · untouched** with the onchain block_time. The signer field shows the agent's pubkey (not the admin's).
-6. Click **Tamper this memory** — backend mutates `payload.confidence` in Postgres.
-7. Page refreshes → ❌ **Tampered · hash mismatch**, with a Solscan link to the original commit.
-8. Click **Restore this memory** — backend copies `original_payload` back into `payload`. Page flips ❌→✅ via the same View Transition. The demo stays replayable for the next visitor.
+7. Click any memory in the **Recent memories** list → `/verify/[id]`.
+8. Status banner shows ✅ **Verified · untouched** with the onchain block_time. The signer field shows the agent's pubkey (not the admin's).
+9. Click **Tamper this memory** — backend mutates `payload.confidence` in Postgres.
+10. Page refreshes → ❌ **Tampered · hash mismatch**, with a Solscan link to the original commit.
+11. Click **Restore this memory** — backend copies `original_payload` back into `payload`. Page flips ❌→✅ via the same View Transition. The demo stays replayable for the next visitor.
 
 ## Getting started
 
@@ -157,7 +165,9 @@ Shingi exposes its tools as an MCP server at `POST /api/mcp`. Any MCP-compatible
 
 Each agent has its own API key, issued during provisioning. Send it as `Authorization: Bearer sk_shingi_<key>` to call `commit_memory`. Read tools work without auth — the data is public-read anyway.
 
-The plaintext key is shown **once** in the response from `POST /api/admin/provision-seeds` (and rendered in the admin "Provision agents" button UI). Only the sha256 hash is stored. If a key is lost, drop the row and re-provision.
+The plaintext key is shown **once** in the response from `POST /api/admin/provision-seeds` (rendered in the admin **Provision agents** button UI). Only the sha256 hash is stored.
+
+**To rotate** all API keys without SQL: click **Rotate API keys** in the admin toolbar (clears every `api_key_hash`), then click **Provision agents** to re-issue. Old plaintext bearers stop authenticating immediately. Keypairs and memories are preserved.
 
 ### Agents
 
@@ -170,7 +180,7 @@ claude mcp add shingi-newagent --transport http http://localhost:3000/api/mcp \
   --header "Authorization: Bearer sk_shingi_<new-key>"
 ```
 
-The agent will sign commit_memory txs with its own keypair (admin keypair pays fees as `feePayer`). Verify any of its memories and you'll see its own pubkey in the `signer` field.
+The agent signs and pays for its own `commit_memory` txs from the wallet that **Create new agent** funded for it (0.05 SOL from your connected wallet, by default). Verify any of its memories and you'll see its own pubkey in the `signer` field. Top up via the per-agent **Fund 0.05 SOL** button on `/agents/<slug>` or the bulk **Fund agents** button if it ever runs low.
 
 ### Test the MCP server
 

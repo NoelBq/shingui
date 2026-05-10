@@ -7,6 +7,7 @@ import { ResetMemoriesButton } from "./reset-memories-button";
 import { SeedMemoriesButton } from "./seed-memories-button";
 import { CreateAgentForm } from "./create-agent-form";
 import { FundAgentsButton } from "./fund-agents-button";
+import { RotateApiKeysButton } from "./rotate-api-keys-button";
 
 export function AdminToolbar() {
   const { connected } = useWallet();
@@ -28,9 +29,10 @@ export function AdminToolbar() {
     <div className="mt-6 flex flex-wrap items-start gap-3">
       <ProvisionAgentsButton />
       <FundAgentsButton />
-      <ResetMemoriesButton />
       <SeedMemoriesButton />
       <CreateAgentForm />
+      <RotateApiKeysButton />
+      <ResetMemoriesButton />
     </div>
   );
 }
