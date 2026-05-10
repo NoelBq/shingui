@@ -140,7 +140,7 @@ export default async function LandingPage({ searchParams }: LandingPageProps) {
                 Browse memories →
               </Link>
               <a
-                href="https://github.com/NoelBq/sol-private#readme"
+                href="https://github.com/NoelBq/shingui#readme"
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-2 rounded-full border border-(--border) bg-transparent px-5 py-3 text-sm font-medium text-(--foreground) transition-colors hover:border-(--accent)/40"
