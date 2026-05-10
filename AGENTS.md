@@ -1,13 +1,13 @@
 <claude-mem-context>
 # Memory Context
 
-# [shingi] recent context, 2026-05-09 9:08pm GMT-3
+# [shingi] recent context, 2026-05-09 10:14pm GMT-3
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 25 obs (8,230t read) | 172,860t work | 95% savings
+Stats: 26 obs (8,578t read) | 174,615t work | 95% savings
 
 ### May 9, 2026
 370 8:01p 🔵 Seed memories endpoint commits trading agent memories to Solana
@@ -16,8 +16,6 @@ Stats: 25 obs (8,230t read) | 172,860t work | 95% savings
 373 8:02p 🟣 Verify page implements full hash validation and tamper detection UI
 374 " 🟣 Demo tamper endpoint mutates Postgres payload to trigger hash mismatch
 375 " 🔵 Data model emphasizes recompute-on-verify by never storing the hash
-S143 Explore UI/design system and prepare for demo execution based on clarified product positioning: detecting post-commit tampering, not proving trustworthiness (May 9 at 8:06 PM)
-S144 Polish the application UI using design handoff specifications: complete redesign replacing kanji branding (真偽) with a modern graph mark system, updated typography (Inter + JetBrains Mono), two-tone colors (green + violet), and integrated design tokens (May 9 at 8:06 PM)
 376 8:06p 🔵 Dev server fails to start: port 3000 already in use or permission denied
 377 8:12p 🔵 Design handoff folder structure mapped for UI Polish
 378 8:13p 🔵 Design handoff specification: brand refresh and UI redesign
@@ -37,22 +35,25 @@ S144 Polish the application UI using design handoff specifications: complete red
 392 " 🟣 ConfBar component created: inline confidence indicator
 393 " 🟣 MemoryTable component created: data table for recent memories
 394 8:24p ✅ Landing page redesigned: hero with verification card + memory table with agent filtering
-S145 Project briefing for Shingi (真偽) — Solana hackathon project for tamper-proof AI agent memory. Claude is beginning to assess the current UI and code state to provide improvement feedback. (May 9 at 8:25 PM)
-S146 Refined product framing for Shingi: clarified core value proposition from "tamper-proof memory" to "cryptographic integrity layer for detecting rewritten agent history." (May 9 at 8:42 PM)
-S147 Demo improvement strategy: shift verification from mechanism-focused to consequence-focused, making the demo show why anyone would care about tamper-detection. (May 9 at 8:46 PM)
-S148 Comprehensive pitch and messaging framework for Shingi: repositioned as "tamper-evident memory for AI agents" with multiple pitch variations, claim guidelines, and FAQ responses for hackathon judges. (May 9 at 8:52 PM)
-S149 Agent runtime integration architecture: design pattern for connecting real AI agents to Shingi memory commitment system with minimal scope expansion. (May 9 at 8:53 PM)
-S150 Evaluating whether exposing an agent memory commit API would be viable for integrations, and determining the chain specificity of the pattern (May 9 at 8:55 PM)
-S151 Should Shingi expose an API for external integrations, and what would the minimal viable surface be? (May 9 at 9:02 PM)
-S152 Should exposing an API be added to Shingi as an integration for the hackathon demo? (May 9 at 9:08 PM)
-**Investigated**: Evaluated the architectural implications of adding a public API endpoint to Shingi, including current signing model (single operator keypair), demo impact, security posture, and scope required to implement cleanly.
+S157 Determine the best approach for API documentation within the hackathon timeframe and how it impacts the pitch narrative (May 9 at 9:43 PM)
+S158 Analyze database schema impact and security risks of adding a public API to the Shingi memory system (May 9 at 9:45 PM)
+395 9:45p 🔵 Existing commitMemoryServer function is reusable for API implementation
+S159 Identify concrete security attack vectors against the API with exploitation examples and mitigation costs (May 9 at 9:46 PM)
+S160 Review and evaluate Shingi project scope to confirm it's the right architectural approach for addressing integration gaps (May 9 at 9:48 PM)
+S161 Architectural decision: custodial vs client-signed API models—which pattern better serves integration story and hackathon demo (May 9 at 9:49 PM)
+S162 Determine optimal deployment architecture for the API—separate service vs integrated with existing Next.js app (May 9 at 9:50 PM)
+S163 Financial risk analysis of token leak scenarios across API models and blockchain networks (May 9 at 9:51 PM)
+S164 Input validation strategy comparison—individual guards vs consolidated schema-based approach for API payload protection (May 9 at 9:52 PM)
+S165 Clarifying MCP approach for Shingi: Understanding how Model Context Protocol integrates with Solana-based agent memory integrity verification (May 9 at 9:53 PM)
+S166 Architectural pivot evaluation—REST API vs MCP (Model Context Protocol) as primary integration surface for Shingi (May 9 at 9:55 PM)
+**Investigated**: MCP protocol capabilities and agent-native patterns; stdio vs HTTP MCP deployment modes; local wallet access implications for client-signed transactions; Claude Desktop MCP support status and maturity; demo experience comparison (UI clicking vs live agent tool invocation); threat model differences between remote (REST) and local (MCP) services
 
-**Learned**: Adding an API transforms Shingi's positioning from "a UI to view hash anchors" to "a service AI agents talk to," materially strengthening the demo. The existing `commitMemoryServer` and `verifyMemory` functions in lib/memory/commit.ts can be directly reused. Current architecture uses single `SHINGI_ADMIN_KEYPAIR` for all commits, so v1 API is "operator commits what you ask" rather than "agents prove their own thoughts" (deferred to v2 with per-agent keypairs). Devnet transaction costs are negligible (~0.000005 SOL/tx).
+**Learned**: MCP is fundamentally more on-brand for "tamper-proof memory for AI agents" than REST—agents configure one line and get native memory tools. Demo beat is decisively stronger with MCP: live Claude Desktop showing agent calling `commit_memory`, seeing tx fire onchain, then calling `verify_memory` and catching tampering in real-time—far more compelling than human clicking UI. Stdio MCP (recommended over HTTP for hackathon) runs locally as subprocess with natural access to user's wallet and RPC, pairs perfectly with client-signed Model C (user's own wallet signs txs). Can eliminate entire bearer-token/rate-limit/DoS guard complexity—stdio is local-only, single-user per instance. Time cost similar (~3 hr vs ~2.5 hr REST) but scope is tighter and story sharper.
 
-**Completed**: Architecture review and decision: API will be added to the project scope. Decision rationale documented: tight scope of 2 endpoints (POST /api/memories, GET /api/verify/[id]) + 1 example client (examples/agent.ts). Bearer token authentication chosen for hackathon to prevent accidental abuse. Per-agent keys and real signature verification deferred to v2 post-hackathon.
+**Completed**: Full architectural comparison completed (REST vs MCP with concrete tool/resource definitions); deployment mode analysis (stdio vs HTTP); demo experience evaluation; threat model reassessment for MCP; revised scope defined with items to keep/drop; recommendation issued (MCP-primary pivot)
 
-**Next Steps**: Awaiting user confirmation on proceeding with detailed implementation plan. If approved, next step is to create a phased plan with file paths, endpoint signatures, and bearer token implementation strategy. Estimated effort: 30–45 minutes. Implementation would include reusing existing memory commit/verify code paths and adding a simple example agent client that demonstrates live ledger population during demo.
+**Next Steps**: Awaiting user confirmation on MCP pivot. If confirmed, Claude will write propose-first plan for MCP-primary architecture: MCP server (stdio, three tools + two resources) + slim public `/api/verify/[id]` endpoint + docs page (rewritten around MCP install) + Claude Desktop example config. Total scope ~3–3.5 hr
 
 
-Access 173k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 175k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>
