@@ -3,13 +3,10 @@ import { notFound } from "next/navigation";
 import { ViewTransition } from "react";
 import { explorerTxUrl, verifyMemory } from "@/lib/memory/verify";
 import { TamperButton } from "./tamper-button";
-import {
-  CheckCircle2,
-  AlertTriangle,
-  ExternalLink,
-  Clock,
-  Pencil,
-} from "lucide-react";
+import { StatusBanner } from "@/components/verify/status-banner";
+import { DiffCard } from "@/components/verify/diff-card";
+import { MetaGrid } from "@/components/verify/meta-grid";
+import { Clock } from "lucide-react";
 
 interface VerifyPageProps {
   params: Promise<{ memoryEventId: string }>;
@@ -36,92 +33,160 @@ export default async function VerifyPage({
   const { event, ok, computedHash, onchainHash, blockTime, signer, txSig } =
     result;
   const rpcError = (result as { rpcError?: string }).rpcError ?? null;
+  const variant = rpcError ? "rpc-error" : ok ? "ok" : "tampered";
+  const eventLabel = `#${event.id.replace(/-/g, "").slice(0, 4)}`;
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-12">
-      <div className="mb-6 flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-(--muted)">
-        <span className="kanji-mark text-(--accent)">真偽</span>
-        <span>Memory verification</span>
-      </div>
+    <div className="relative">
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-[420px] shingi-grid shingi-grid-mask opacity-40"
+        aria-hidden
+      />
+      <div className="relative mx-auto max-w-5xl px-6 py-12">
+        <div className="mb-5 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.22em] text-(--muted)">
+          <Link href="/#memories" className="hover:text-(--foreground)">
+            ← memories
+          </Link>
+          <span>/</span>
+          <span>verify · {eventLabel}</span>
+        </div>
 
-      {tamperDiff ? (
-        <ViewTransition enter="tamper-diff-enter" default="none">
-          <TamperDiffBanner
-            field={tamperDiff.field}
-            before={tamperDiff.before}
-            after={tamperDiff.after}
+        {tamperDiff && variant === "tampered" ? (
+          <ViewTransition enter="tamper-diff-enter" default="none">
+            <TamperDiffBanner
+              field={tamperDiff.field}
+              before={tamperDiff.before}
+              after={tamperDiff.after}
+            />
+          </ViewTransition>
+        ) : null}
+
+        <ViewTransition
+          name="verify-status"
+          share={{ default: "verify-status-flip" }}
+        >
+          <StatusBanner
+            variant={variant}
+            blockTime={blockTime}
+            rpcError={rpcError}
           />
         </ViewTransition>
-      ) : null}
 
-      <ViewTransition
-        name="verify-status"
-        share={{ default: "verify-status-flip" }}
-      >
-        <StatusBanner ok={ok} rpcError={rpcError} blockTime={blockTime} />
-      </ViewTransition>
-
-      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr]">
-        <section className="rounded-2xl border border-(--border) bg-(--surface)/60 p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-(--muted)">
-            Payload (live from Postgres)
-          </h2>
-          <pre className="mt-3 overflow-x-auto rounded-lg bg-black/40 p-4 text-xs leading-relaxed text-(--foreground)">
-{JSON.stringify(event.payload, null, 2)}
-          </pre>
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <TamperButton memoryEventId={event.id} />
-            <span className="text-xs text-(--muted)">
-              Mutates payload.confidence in Postgres. Onchain commit is
-              untouched. The next verify will mismatch.
-            </span>
+        {variant === "tampered" && tamperDiff ? (
+          <div className="mt-7 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <DiffCard
+              title="Recomputed (live payload)"
+              variant="live"
+              hash={`0x${computedHash.slice(0, 12)}…${computedHash.slice(-10)}`}
+              hashLabel="(mismatch)"
+              fields={buildDiffFields(event.payload, tamperDiff, "live")}
+            />
+            <DiffCard
+              title="Onchain commit"
+              variant="onchain"
+              hash={
+                onchainHash
+                  ? `0x${onchainHash.slice(0, 12)}…${onchainHash.slice(-10)}`
+                  : "—"
+              }
+              fields={buildDiffFields(event.payload, tamperDiff, "onchain")}
+            />
           </div>
-        </section>
-
-        <aside className="space-y-4">
-          <DetailCard label="Computed hash" value={computedHash} mono />
-          <DetailCard
-            label="Onchain hash"
-            value={onchainHash ?? "— (no tx fetched)"}
-            mono
-          />
-          <DetailCard label="Signer" value={signer ?? "—"} mono />
-          <DetailCard
-            label="Block time"
-            value={blockTime ? new Date(blockTime * 1000).toISOString() : "—"}
-          />
-          {result.timestampDivergenceSeconds !== null ? (
-            <div className="rounded-2xl border border-(--warning)/40 bg-(--warning)/5 p-4 text-xs text-(--warning)">
-              <div className="flex items-center gap-2 font-semibold uppercase tracking-[0.16em]">
-                <Clock className="h-3.5 w-3.5" />
-                Timestamp divergence
-              </div>
-              <p className="mt-2 leading-relaxed">
-                Agent&apos;s self-reported time and onchain block_time differ by{" "}
-                {result.timestampDivergenceSeconds}s. Could be commit latency,
-                could be backdating.
-              </p>
+        ) : (
+          <section className="mt-7 rounded-2xl border border-(--border) bg-(--surface)/60 p-5">
+            <h2 className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-(--muted)">
+              Payload (live from Postgres)
+            </h2>
+            <pre className="mt-3 overflow-x-auto rounded-lg bg-black/40 p-4 text-xs leading-relaxed text-(--foreground)">
+{JSON.stringify(event.payload, null, 2)}
+            </pre>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <TamperButton memoryEventId={event.id} />
+              <span className="text-xs text-(--muted)">
+                Mutates payload.confidence in Postgres. Onchain commit is
+                untouched. The next verify will mismatch.
+              </span>
             </div>
-          ) : null}
-          <a
-            href={explorerTxUrl(txSig)}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center justify-between rounded-2xl border border-(--border) bg-(--surface)/60 p-4 text-sm text-(--foreground) transition-colors hover:border-(--accent)/40"
-          >
-            <span>View on Solscan</span>
-            <ExternalLink className="h-4 w-4 text-(--muted)" />
-          </a>
-        </aside>
-      </div>
+          </section>
+        )}
 
-      <div className="mt-10 text-xs text-(--muted)">
-        <Link href="/" className="hover:text-(--foreground)">
-          ← back
-        </Link>
+        <div className="mt-6">
+          <MetaGrid
+            items={[
+              {
+                label: "Signer",
+                value: signer
+                  ? `${signer.slice(0, 4)}…${signer.slice(-4)}`
+                  : "—",
+              },
+              {
+                label: "Block time",
+                value: blockTime
+                  ? new Date(blockTime * 1000).toUTCString()
+                  : "—",
+              },
+              {
+                label: "Onchain hash",
+                value: onchainHash
+                  ? `0x${onchainHash.slice(0, 6)}…${onchainHash.slice(-6)}`
+                  : "—",
+              },
+              {
+                label: "Tx",
+                value: `${txSig.slice(0, 4)}…${txSig.slice(-4)} ↗`,
+                href: explorerTxUrl(txSig),
+              },
+            ]}
+          />
+        </div>
+
+        {result.timestampDivergenceSeconds !== null ? (
+          <div className="mt-6 rounded-2xl border border-(--warning)/40 bg-(--warning)/5 p-4 text-xs text-(--warning)">
+            <div className="flex items-center gap-2 font-mono font-semibold uppercase tracking-[0.22em]">
+              <Clock className="h-3.5 w-3.5" />
+              timestamp divergence
+            </div>
+            <p className="mt-2 leading-relaxed">
+              Agent&apos;s self-reported time and onchain block_time differ by{" "}
+              {result.timestampDivergenceSeconds}s. Could be commit latency,
+              could be backdating.
+            </p>
+          </div>
+        ) : null}
       </div>
     </div>
   );
+}
+
+function buildDiffFields(
+  payload: Record<string, unknown>,
+  tamperDiff: { field: string; before: string; after: string },
+  variant: "live" | "onchain",
+) {
+  const fields: { key: string; value: string; flagged?: boolean }[] = [];
+
+  const content =
+    typeof payload.content === "string" ? payload.content : null;
+  if (content) {
+    const truncated =
+      content.length > 56 ? `${content.slice(0, 55)}…` : content;
+    fields.push({ key: "content", value: `"${truncated}"` });
+  }
+
+  const flaggedField = tamperDiff.field;
+  const liveValue =
+    payload[flaggedField] !== undefined
+      ? JSON.stringify(payload[flaggedField])
+      : tamperDiff.after;
+  const onchainValue = tamperDiff.before;
+
+  fields.push({
+    key: flaggedField,
+    value: variant === "live" ? liveValue : onchainValue,
+    flagged: true,
+  });
+
+  return fields;
 }
 
 function TamperDiffBanner({
@@ -134,103 +199,20 @@ function TamperDiffBanner({
   after: string;
 }) {
   return (
-    <div className="mb-6 flex items-center gap-3 rounded-2xl border border-rose-500/40 bg-rose-500/5 p-4 text-sm">
-      <Pencil className="h-4 w-4 shrink-0 text-rose-400" />
+    <div className="mb-5 flex items-center gap-3 rounded-2xl border border-(--danger)/40 bg-(--danger)/5 p-4 text-sm">
+      <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-(--danger)/15 text-(--danger)">
+        ✎
+      </div>
       <div className="flex flex-1 flex-wrap items-center gap-2 text-(--foreground)">
-        <span className="text-xs uppercase tracking-[0.16em] text-rose-300">
-          Just tampered
+        <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-(--danger)">
+          just tampered
         </span>
         <code className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-xs">
           payload.{field}
         </code>
         <span className="font-mono text-xs text-(--muted)">{before}</span>
         <span className="text-xs text-(--muted)">→</span>
-        <span className="font-mono text-xs text-rose-300">{after}</span>
-      </div>
-    </div>
-  );
-}
-
-function StatusBanner({
-  ok,
-  rpcError,
-  blockTime,
-}: {
-  ok: boolean;
-  rpcError: string | null;
-  blockTime: number | null;
-}) {
-  if (rpcError) {
-    return (
-      <div className="rounded-2xl border border-(--warning)/40 bg-(--warning)/5 p-5">
-        <div className="flex items-center gap-2 text-(--warning)">
-          <AlertTriangle className="h-5 w-5" />
-          <span className="text-sm font-semibold uppercase tracking-[0.16em]">
-            Could not fetch onchain tx
-          </span>
-        </div>
-        <p className="mt-2 text-sm text-(--muted)">{rpcError}</p>
-      </div>
-    );
-  }
-  if (ok) {
-    return (
-      <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/5 p-5">
-        <div className="flex items-center gap-2 text-emerald-400">
-          <CheckCircle2 className="h-5 w-5" />
-          <span className="text-sm font-semibold uppercase tracking-[0.16em]">
-            Verified · untouched
-          </span>
-        </div>
-        <p className="mt-2 text-sm text-(--muted)">
-          The recomputed hash of the live payload matches the onchain commit
-          {blockTime
-            ? ` from ${new Date(blockTime * 1000).toUTCString()}.`
-            : "."}
-        </p>
-      </div>
-    );
-  }
-  return (
-    <div className="rounded-2xl border border-rose-500/40 bg-rose-500/5 p-5">
-      <div className="flex items-center gap-2 text-rose-400">
-        <AlertTriangle className="h-5 w-5" />
-        <span className="text-sm font-semibold uppercase tracking-[0.16em]">
-          Tampered · hash mismatch
-        </span>
-      </div>
-      <p className="mt-2 text-sm text-(--muted)">
-        The current Postgres payload no longer hashes to the value committed
-        onchain
-        {blockTime ? ` at ${new Date(blockTime * 1000).toUTCString()}` : ""}.
-        Either the payload has been edited since commit, or a different
-        payload was committed under this signature.
-      </p>
-    </div>
-  );
-}
-
-function DetailCard({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
-  return (
-    <div className="rounded-2xl border border-(--border) bg-(--surface)/60 p-4">
-      <div className="text-[11px] uppercase tracking-[0.16em] text-(--muted)">
-        {label}
-      </div>
-      <div
-        className={
-          "mt-2 break-all text-xs text-(--foreground) " +
-          (mono ? "font-mono" : "")
-        }
-      >
-        {value}
+        <span className="font-mono text-xs text-(--danger)">{after}</span>
       </div>
     </div>
   );

@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { ShieldCheck, Hash, FileSearch, ArrowRight } from "lucide-react";
 import { getServerSupabase, getServiceSupabase } from "@/lib/supabase/server";
 import { SeedMemoriesButton } from "@/components/shared/seed-memories-button";
+import { VerificationCard } from "@/components/hero/verification-card";
+import { MemoryTable } from "@/components/memory/memory-table";
 import type { MemoryEvent } from "@/types";
 
 interface RecentMemory {
@@ -37,126 +38,208 @@ async function loadRecentMemories(limit = 12): Promise<RecentMemory[]> {
   });
 }
 
-export default async function LandingPage() {
+interface LandingPageProps {
+  searchParams: Promise<{ agent?: string }>;
+}
+
+export default async function LandingPage({ searchParams }: LandingPageProps) {
   const adminEnabled = process.env.NEXT_PUBLIC_SHINGI_ADMIN_ENABLED === "true";
   const recent = await loadRecentMemories();
+  const sp = await searchParams;
+  const activeAgent = sp.agent ?? "";
+
+  const uniqueAgents = Array.from(
+    new Map(recent.map((m) => [m.agent_slug, m.agent_name])).entries(),
+  );
+  const filtered = activeAgent
+    ? recent.filter((m) => m.agent_slug === activeAgent)
+    : recent;
+
+  const showcase = recent[0];
 
   return (
     <div className="relative">
       <section className="relative isolate overflow-hidden border-b border-(--border)">
-        <div className="pointer-events-none absolute inset-0 shingi-grid opacity-50" aria-hidden />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-b from-transparent to-(--background)" aria-hidden />
-        <div className="mx-auto max-w-7xl px-6 pt-24 pb-20">
-          <div className="flex flex-col items-start gap-6">
-            <span className="inline-flex items-center gap-2 rounded-full border border-(--border) bg-(--surface)/60 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-(--muted)">
-              <span className="kanji-mark text-(--accent)">真偽</span>
-              <span>Truth · Falsehood · Onchain</span>
+        <div
+          className="pointer-events-none absolute inset-0 shingi-grid shingi-grid-mask opacity-50"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -left-[10%] -top-[20%] h-full w-[55%] blur-3xl"
+          style={{
+            background:
+              "radial-gradient(ellipse at center, rgba(52,211,153,0.18) 0%, transparent 60%)",
+          }}
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -right-[5%] -bottom-[30%] h-full w-[50%] blur-3xl"
+          style={{
+            background:
+              "radial-gradient(ellipse at center, rgba(167,139,250,0.16) 0%, transparent 60%)",
+          }}
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-b from-transparent to-(--background)"
+          aria-hidden
+        />
+
+        <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-start gap-12 px-6 py-20 lg:grid-cols-[1.05fr_1fr] lg:gap-16 lg:py-24">
+          <div>
+            <span className="inline-flex items-center gap-2.5 rounded-full border border-(--border) bg-(--surface)/60 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.28em] text-(--muted)">
+              <span className="h-1.5 w-1.5 rounded-full bg-(--accent) shadow-[0_0_10px_var(--accent)]" />
+              truth · falsehood · onchain
             </span>
-            <h1 className="max-w-3xl text-5xl font-semibold leading-[1.05] tracking-tight text-(--foreground) sm:text-6xl">
+            <h1 className="mt-7 max-w-3xl text-5xl font-semibold leading-[1.02] tracking-[-0.035em] text-(--foreground) sm:text-6xl lg:text-[68px]">
               Tamper-proof memory for{" "}
               <span className="text-(--accent)">autonomous AI agents</span>.
             </h1>
-            <p className="max-w-2xl text-lg leading-relaxed text-(--muted)">
+            <p className="mt-5 max-w-xl text-[17px] leading-[1.55] text-(--muted)">
               Every thought, observation, and decision an agent records gets
-              hash-anchored to Solana. Anyone can verify the log hasn&apos;t been
-              edited since it was committed — payload in, hash out, match or
-              mismatch.
+              hash-anchored to Solana. Anyone can verify the log hasn&apos;t
+              been edited since it was committed.
             </p>
-            {adminEnabled ? <SeedMemoriesButton /> : null}
+            <div className="mt-8 flex flex-wrap items-center gap-2.5">
+              <Link
+                href="#memories"
+                className="inline-flex items-center gap-2 rounded-full bg-(--accent) px-5 py-3 text-sm font-semibold text-(--accent-foreground) transition-opacity hover:opacity-90"
+              >
+                Browse memories →
+              </Link>
+              <a
+                href="https://github.com/NoelBq/sol-private#readme"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-full border border-(--border) bg-transparent px-5 py-3 text-sm font-medium text-(--foreground) transition-colors hover:border-(--accent)/40"
+              >
+                Read the spec
+              </a>
+            </div>
+            {adminEnabled ? (
+              <div className="mt-6">
+                <SeedMemoriesButton />
+              </div>
+            ) : null}
+            <div className="mt-12 flex flex-wrap items-center gap-5 font-mono text-[11px] uppercase tracking-[0.2em] text-(--muted)">
+              <span>Built on</span>
+              <span className="font-sans text-sm font-medium tracking-[0.04em] text-(--foreground)">
+                solana
+              </span>
+              <span aria-hidden className="h-3.5 w-px bg-(--border)" />
+              <span className="font-sans text-sm font-medium tracking-[0.04em] text-(--foreground)">
+                anchor
+              </span>
+              <span aria-hidden className="h-3.5 w-px bg-(--border)" />
+              <span className="font-sans text-sm font-medium tracking-[0.04em] text-(--foreground)">
+                supabase
+              </span>
+            </div>
           </div>
 
-          <div className="mt-16 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Pillar
-              icon={<Hash className="h-4 w-4" />}
-              title="Hash-anchored"
-              body="Each memory event is hashed and committed in a single Solana transaction. Block timestamp comes from consensus."
-            />
-            <Pillar
-              icon={<ShieldCheck className="h-4 w-4" />}
-              title="Operator-resistant"
-              body="The verifier always recomputes the hash from the live payload. Edits to the database after the fact are detectable."
-            />
-            <Pillar
-              icon={<FileSearch className="h-4 w-4" />}
-              title="Auditable"
-              body="Every commit has a Solscan link. Honest about scope: this proves integrity, not truth — the agent could still be wrong."
-            />
+          <div className="grid w-full place-items-center lg:place-items-end">
+            {showcase ? (
+              <VerificationCard
+                id={showcase.id}
+                agentName={showcase.agent_name}
+                payload={showcase.payload}
+                txSig={showcase.solana_tx_sig}
+                createdAt={showcase.created_at}
+              />
+            ) : (
+              <ShowcasePlaceholder adminEnabled={adminEnabled} />
+            )}
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-16">
-        <div className="mb-6 flex items-end justify-between gap-4">
+      <section id="memories" className="mx-auto max-w-7xl px-6 py-16">
+        <div className="mb-7 flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-end">
           <div>
-            <h2 className="text-2xl font-semibold text-(--foreground)">
+            <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.28em] text-(--accent)">
+              live ledger
+            </div>
+            <h2 className="text-3xl font-semibold tracking-[-0.025em] text-(--foreground) sm:text-4xl">
               Recent memories
             </h2>
-            <p className="mt-1 text-sm text-(--muted)">
-              Live from Postgres. Click any row to verify it against its
-              onchain commit.
+            <p className="mt-1.5 text-sm text-(--muted)">
+              Live from Postgres. Every row is recomputed against its onchain
+              commit on click.
             </p>
           </div>
+          {uniqueAgents.length > 1 ? (
+            <FilterPills agents={uniqueAgents} active={activeAgent} />
+          ) : null}
         </div>
-        {recent.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-(--border) bg-(--surface)/40 p-10 text-center text-sm text-(--muted)">
-            {adminEnabled
-              ? "No memory events yet. Click 'Seed memories (admin)' above to commit six events to devnet."
-              : "No memory events yet."}
+            {recent.length === 0
+              ? adminEnabled
+                ? "No memory events yet. Click 'Seed memories (admin)' above to commit six events to devnet."
+                : "No memory events yet."
+              : "No memories for this agent yet."}
           </div>
         ) : (
-          <ul className="grid grid-cols-1 gap-3">
-            {recent.map((m) => (
-              <li key={m.id}>
-                <Link
-                  href={`/verify/${m.id}`}
-                  className="group flex items-center justify-between gap-6 rounded-2xl border border-(--border) bg-(--surface)/60 p-4 transition-colors hover:border-(--accent)/40"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-(--muted)">
-                      <span>{m.agent_name}</span>
-                      <span>·</span>
-                      <span>
-                        {new Date(m.created_at).toLocaleString(undefined, {
-                          dateStyle: "short",
-                          timeStyle: "short",
-                        })}
-                      </span>
-                    </div>
-                    <p className="mt-1 truncate text-sm text-(--foreground)">
-                      {typeof m.payload.content === "string"
-                        ? m.payload.content
-                        : JSON.stringify(m.payload).slice(0, 140)}
-                    </p>
-                  </div>
-                  <ArrowRight className="h-4 w-4 shrink-0 text-(--muted) transition-transform group-hover:translate-x-0.5 group-hover:text-(--accent)" />
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <MemoryTable rows={filtered} />
         )}
       </section>
     </div>
   );
 }
 
-function Pillar({
-  icon,
-  title,
-  body,
+function FilterPills({
+  agents,
+  active,
 }: {
-  icon: React.ReactNode;
-  title: string;
-  body: string;
+  agents: Array<[string, string]>;
+  active: string;
 }) {
   return (
-    <div className="rounded-2xl border border-(--border) bg-(--surface)/60 p-5">
-      <div className="flex items-center gap-2 text-(--accent)">
-        {icon}
-        <span className="text-[11px] uppercase tracking-[0.18em]">
-          {title}
-        </span>
-      </div>
-      <p className="mt-3 text-sm leading-relaxed text-(--muted)">{body}</p>
+    <div className="flex flex-wrap gap-2">
+      <FilterPill href="/#memories" label="All agents" active={!active} />
+      {agents.map(([slug, name]) => (
+        <FilterPill
+          key={slug}
+          href={`/?agent=${encodeURIComponent(slug)}#memories`}
+          label={name}
+          active={active === slug}
+        />
+      ))}
+    </div>
+  );
+}
+
+function FilterPill({
+  href,
+  label,
+  active,
+}: {
+  href: string;
+  label: string;
+  active: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      scroll={false}
+      className={
+        "rounded-full border px-3 py-1.5 font-mono text-[11px] tracking-[0.04em] transition-colors " +
+        (active
+          ? "border-(--accent)/55 bg-(--accent)/10 text-(--accent)"
+          : "border-(--border) text-(--muted) hover:text-(--foreground)")
+      }
+    >
+      {label}
+    </Link>
+  );
+}
+
+function ShowcasePlaceholder({ adminEnabled }: { adminEnabled: boolean }) {
+  return (
+    <div className="grid w-full max-w-[460px] place-items-center rounded-[18px] border border-dashed border-(--border) bg-(--surface)/40 p-10 text-center text-sm text-(--muted)">
+      {adminEnabled
+        ? "No memory events yet. Seed some to populate the showcase."
+        : "No memory events yet."}
     </div>
   );
 }
