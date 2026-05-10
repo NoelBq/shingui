@@ -1,4 +1,4 @@
-import { Connection, Keypair } from "@solana/web3.js";
+import { Connection } from "@solana/web3.js";
 
 export function getRpcUrl(): string {
   return (
@@ -10,29 +10,4 @@ export function getRpcUrl(): string {
 
 export function getRpcConnection(): Connection {
   return new Connection(getRpcUrl(), "confirmed");
-}
-
-export function loadAdminKeypair(): Keypair {
-  const raw = process.env.SHINGI_ADMIN_KEYPAIR;
-  if (!raw) {
-    throw new Error(
-      "SHINGI_ADMIN_KEYPAIR is not set. Generate with `solana-keygen new -o /tmp/admin.json --no-bip39-passphrase --silent` then paste the file contents into .env.local as SHINGI_ADMIN_KEYPAIR='[...]'.",
-    );
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error(
-      "SHINGI_ADMIN_KEYPAIR is not valid JSON. Expected a JSON array of 64 bytes.",
-    );
-  }
-  if (!Array.isArray(parsed) || parsed.length !== 64) {
-    throw new Error(
-      `SHINGI_ADMIN_KEYPAIR must be a JSON array of 64 bytes, got ${
-        Array.isArray(parsed) ? `array of ${parsed.length}` : typeof parsed
-      }.`,
-    );
-  }
-  return Keypair.fromSecretKey(Uint8Array.from(parsed as number[]));
 }

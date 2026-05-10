@@ -64,13 +64,14 @@ Admin actions (provision, reset, seed, create new agent, MCP `commit_memory`) ar
 
 When admin is enabled (`NEXT_PUBLIC_SHINGI_ADMIN_ENABLED=true`), the landing page exposes three admin buttons:
 
-1. **Provision agents** — for each seeded agent missing credentials, generates a Solana keypair (`agents.secret_key`) and an MCP API key (`agents.api_key_hash` + `agents.api_key_prefix`). Idempotent at the column level — only fills in what's missing. Plaintext API keys are revealed **once** in the response panel; copy them then.
+1. **Provision agents** — for each seeded agent missing credentials, generates a Solana keypair (`agents.secret_key`), requests a 0.5 SOL devnet airdrop into it, and issues an MCP API key (`agents.api_key_hash` + `agents.api_key_prefix`). Idempotent at the column level — only fills in what's missing. Plaintext API keys are revealed **once** in the response panel; copy them then. Any agents whose airdrop failed surface in `funding_pending` so you can fund them manually.
 2. **Reset memories** — wipes the `memory_events` table. Onchain commits stay; only the Postgres pointer table is cleared. Useful between demo recordings.
-3. **Seed memories** — commits 6 memory events to devnet, each signed by its own agent's keypair (admin pays fees as `feePayer`). Each row also stores `original_payload` so restore stays available.
+3. **Seed memories** — commits 6 memory events to devnet, each signed and paid for by the agent's own keypair (no shared fee payer). Each row also stores `original_payload` so restore stays available.
 
 Then the verify loop:
 
 4. Click any memory in the **Recent memories** list → `/verify/[id]`.
+
 5. Status banner shows ✅ **Verified · untouched** with the onchain block_time. The signer field shows the agent's pubkey (not the admin's).
 6. Click **Tamper this memory** — backend mutates `payload.confidence` in Postgres.
 7. Page refreshes → ❌ **Tampered · hash mismatch**, with a Solscan link to the original commit.
@@ -125,11 +126,12 @@ Copy `.env.example` to `.env.local` and fill in.
 | `NEXT_PUBLIC_SUPABASE_URL`         | yes      | Supabase project URL                                                                                                                                                                                                                                  |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY`    | yes      | Supabase anon key (read-only RLS)                                                                                                                                                                                                                     |
 | `SUPABASE_SERVICE_ROLE_KEY`        | yes      | Service role key for server inserts (seed + tamper routes)                                                                                                                                                                                            |
-| `SHINGI_ADMIN_KEYPAIR`             | yes      | JSON array of 64 bytes — the keypair that signs `commit_memory` txs from the admin seed route. Generate with `solana-keygen new -o /tmp/admin.json --no-bip39-passphrase --silent` and paste the file contents. **Fund it on devnet** before seeding. |
-| `NEXT_PUBLIC_SHINGI_ADMIN_ENABLED` | no       | Set to `"true"` to show the "Seed memories" button on the landing page                                                                                                                                                                                |
+| `NEXT_PUBLIC_SHINGI_ADMIN_ENABLED` | no       | Set to `"true"` to show the admin toolbar (Provision / Reset / Seed / Create new agent) on the landing page                                                                                                                                          |
 | `NEXT_PUBLIC_SOLANA_RPC_URL`       | no       | Override RPC endpoint (default: `https://api.devnet.solana.com`). Used by both server and wallet adapter.                                                                                                                                             |
 | `SOLANA_RPC_URL`                   | no       | Server-only RPC override (takes precedence over `NEXT_PUBLIC_SOLANA_RPC_URL`). Useful if you have a paid endpoint server-side.                                                                                                                        |
 | `NEXT_PUBLIC_SOLANA_CLUSTER`       | no       | Used to build Solscan links. Default: `devnet`. Set to `mainnet` for production.                                                                                                                                                                      |
+
+> Each agent funds its own commits. On provisioning, the route requests a 0.5 SOL devnet airdrop into the agent's freshly-generated wallet. If the airdrop fails (devnet is rate-limited), the response surfaces `funding_pending` with the pubkey so you can fund manually with `solana airdrop 0.5 <pubkey>` or `solana transfer <pubkey> 0.5 --keypair <your-funded-wallet>`.
 
 ## Known limitations (acknowledged)
 

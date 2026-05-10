@@ -8,7 +8,6 @@ import {
 import { hashPayloadBytes } from "./hash";
 import { encodeCommitMemoryIx } from "./program";
 import { loadAgentKeypair } from "./agent";
-import { loadAdminKeypair } from "./connection";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import type { MemoryPayload } from "@/types";
 
@@ -23,7 +22,6 @@ export async function commitMemoryServer(params: {
   payload: MemoryPayload;
 }): Promise<CommitMemoryResult> {
   const agentKeypair = await loadAgentKeypair(params.agentId);
-  const feePayer = loadAdminKeypair();
 
   const hash = await hashPayloadBytes(params.payload);
 
@@ -34,12 +32,11 @@ export async function commitMemoryServer(params: {
   });
 
   const tx = new Transaction().add(ix);
-  tx.feePayer = feePayer.publicKey;
 
   const txSig = await sendAndConfirmTransaction(
     params.connection,
     tx,
-    [feePayer, agentKeypair],
+    [agentKeypair],
     { commitment: "confirmed" },
   );
 
