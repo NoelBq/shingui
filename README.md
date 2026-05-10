@@ -1,9 +1,61 @@
-# Shingi (真偽)
+<p align="center">
+  <img src="public/brand/readme-banner.svg" alt="Shingi banner" width="960" />
+</p>
 
-Tamper-proof memory layer for autonomous AI agents on Solana. Every thought, observation, or decision an agent records gets hash-anchored to a single Solana transaction. Anyone can verify the log hasn't been edited since it was committed.
+<h1 align="center">Shingi</h1>
 
-**What it provides:** cryptographic integrity for agent memory logs.
-**What it does NOT provide:** truth, hallucination detection, or "AI forensics." The trust boundary is operator vs. user — not AI vs. user.
+<p align="center">
+  <strong>Tamper-evident memory for autonomous AI agents on Solana.</strong><br />
+  Hash-anchor offchain memory logs and verify whether they were rewritten after commit.
+</p>
+
+<p align="center">
+  <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-111111?style=flat-square&logo=nextdotjs" />
+  <img alt="React 19" src="https://img.shields.io/badge/React-19-111111?style=flat-square&logo=react" />
+  <img alt="Solana Devnet" src="https://img.shields.io/badge/Solana-devnet-111111?style=flat-square&logo=solana" />
+  <img alt="Supabase Postgres" src="https://img.shields.io/badge/Supabase-Postgres-111111?style=flat-square&logo=supabase" />
+  <img alt="Anchor" src="https://img.shields.io/badge/Anchor-0.31.1-111111?style=flat-square" />
+  <img alt="Bun" src="https://img.shields.io/badge/Bun-runtime-111111?style=flat-square&logo=bun" />
+</p>
+
+> Shingi provides cryptographic integrity for agent memory logs.
+>
+> It does **not** provide truth verification, hallucination detection, or "AI forensics." The trust boundary is operator vs. user, not AI vs. user.
+
+## At a glance
+
+| Layer | What lives there | Why it matters |
+|---|---|---|
+| Postgres `memory_events` | `payload jsonb`, `solana_tx_sig` | Fast reads, mutable by the operator |
+| Solana | One `commit_memory(agent, hash)` tx per event | Public, consensus-stamped integrity anchor |
+| Verifier | Live payload recompute + onchain comparison | Detects post-hoc edits to the offchain record |
+
+## How it works
+
+```mermaid
+flowchart LR
+    A[Agent records memory payload] --> B[Canonicalize JSON<br/>and sha256 hash]
+    B --> C[commit_memory(agent, hash)<br/>on Solana]
+    B --> D[Store full payload<br/>in Postgres]
+    D --> E[Verifier recomputes hash<br/>from live payload]
+    C --> E
+    E --> F{Hashes match?}
+    F -->|Yes| G[Untouched]
+    F -->|No| H[Tampered]
+```
+
+The hash is **not** stored in Postgres. The verifier always recomputes `sha256(canonicalJson(payload))` from the live row and compares it to the onchain commit. A stored hash would just be another field the operator can edit.
+
+## Demo flow
+
+`Seed memories -> verify untouched -> tamper Postgres payload -> verify mismatch`
+
+1. Visit `/` and, when admin mode is enabled, click **Seed memories (admin)**.
+2. The server commits 6 memory events to devnet using the admin keypair.
+3. Open any memory from **Recent memories** to load `/verify/[id]`.
+4. The page shows **Verified - untouched** when the recomputed hash matches the Solana commit.
+5. Click **Tamper this memory** to mutate `payload.confidence` in Postgres.
+6. Refresh verification and the page flips to **Tampered - hash mismatch** with the original Solscan link still intact.
 
 ## Stack
 
@@ -11,24 +63,6 @@ Tamper-proof memory layer for autonomous AI agents on Solana. Every thought, obs
 - Supabase (Postgres) for live payload storage
 - Solana devnet, single-instruction Anchor program ([programs/shingi/](programs/shingi/))
 - LiteSVM for in-process program tests
-
-## Architecture (Pattern A)
-
-| Layer | What lives there | Mutability |
-|---|---|---|
-| Postgres `memory_events` | `payload jsonb`, `solana_tx_sig` | Operator-controlled (mutable) |
-| Solana | One `commit_memory(agent, hash)` tx per event | Consensus-stamped (immutable) |
-
-The hash is **not** stored in Postgres. The verifier always recomputes `sha256(canonicalJson(payload))` from the live row and compares to the onchain commit. A stored hash would just be another field the operator can edit.
-
-## Demo flow
-
-1. Visit `/` — landing page with three pillars and (when admin is enabled) a "Seed memories" button.
-2. Click **Seed memories (admin)** — server commits 6 memory events to devnet using the admin keypair.
-3. Click any memory in the **Recent memories** list → `/verify/[id]` page.
-4. Status banner shows ✅ **Verified · untouched** with the onchain block_time.
-5. Click **Tamper this memory** — backend mutates `payload.confidence` in Postgres.
-6. Page refreshes → ❌ **Tampered · hash mismatch**, with a Solscan link to the original commit.
 
 ## Getting started
 
