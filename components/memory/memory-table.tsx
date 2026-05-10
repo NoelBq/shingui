@@ -1,7 +1,10 @@
 import Link from "next/link";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { hashPayloadHex } from "@/lib/memory/hash";
 import { ConfBar } from "@/components/memory/conf-bar";
 import type { MemoryEvent } from "@/types";
+
+const LOW_THRESHOLD_LAMPORTS = 0.01 * LAMPORTS_PER_SOL;
 
 interface MemoryRow {
   id: string;
@@ -10,6 +13,7 @@ interface MemoryRow {
   payload: MemoryEvent["payload"];
   solana_tx_sig: string;
   created_at: string;
+  balance_lamports?: number | null;
 }
 
 interface MemoryTableProps {
@@ -61,8 +65,24 @@ export async function MemoryTable({ rows }: MemoryTableProps) {
               (i < enriched.length - 1 ? "border-b border-(--border)" : "")
             }
           >
-            <span className="truncate text-[13px] font-semibold text-(--foreground)">
-              {m.agent_name}
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate text-[13px] font-semibold text-(--foreground)">
+                {m.agent_name}
+              </span>
+              {typeof m.balance_lamports === "number" ? (
+                <span
+                  className={
+                    "font-mono text-[10px] tabular-nums " +
+                    (m.balance_lamports < LOW_THRESHOLD_LAMPORTS
+                      ? "text-(--warning)"
+                      : "text-(--muted)")
+                  }
+                  title={`${(m.balance_lamports / LAMPORTS_PER_SOL).toFixed(6)} SOL`}
+                >
+                  {(m.balance_lamports / LAMPORTS_PER_SOL).toFixed(4)} SOL
+                  {m.balance_lamports < LOW_THRESHOLD_LAMPORTS ? " · low" : ""}
+                </span>
+              ) : null}
             </span>
             <span className="font-mono text-[11px] text-(--muted) tabular-nums">
               {time}

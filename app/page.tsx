@@ -1,14 +1,17 @@
 import Link from "next/link";
+import { PublicKey } from "@solana/web3.js";
 import { getServerSupabase, getServiceSupabase } from "@/lib/supabase/server";
 import { AdminToolbar } from "@/components/shared/admin-toolbar";
 import { VerificationCard } from "@/components/hero/verification-card";
 import { MemoryTable } from "@/components/memory/memory-table";
+import { getRpcConnection } from "@/lib/memory/connection";
 import type { MemoryEvent } from "@/types";
 
 interface RecentMemory {
   id: string;
   agent_name: string;
   agent_slug: string;
+  agent_pubkey: string;
   payload: MemoryEvent["payload"];
   solana_tx_sig: string;
   created_at: string;
@@ -20,13 +23,17 @@ async function loadRecentMemories(limit = 12): Promise<RecentMemory[]> {
   const { data, error } = await sb
     .from("memory_events")
     .select(
-      "id, payload, solana_tx_sig, created_at, agents:agents(name, slug)",
+      "id, payload, solana_tx_sig, created_at, agents:agents(name, slug, owner_wallet)",
     )
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error || !data) return [];
   return data.map((row) => {
-    const agent = (row as { agents?: { name?: string; slug?: string } }).agents;
+    const agent = (
+      row as {
+        agents?: { name?: string; slug?: string; owner_wallet?: string };
+      }
+    ).agents;
     return {
       id: row.id as string,
       payload: row.payload as MemoryEvent["payload"],
@@ -34,8 +41,29 @@ async function loadRecentMemories(limit = 12): Promise<RecentMemory[]> {
       created_at: row.created_at as string,
       agent_name: agent?.name ?? "—",
       agent_slug: agent?.slug ?? "",
+      agent_pubkey: agent?.owner_wallet ?? "",
     };
   });
+}
+
+async function loadBalanceByPubkey(
+  pubkeys: string[],
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  const unique = Array.from(new Set(pubkeys.filter(Boolean)));
+  if (unique.length === 0) return result;
+  try {
+    const connection = getRpcConnection();
+    const accounts = await connection.getMultipleAccountsInfo(
+      unique.map((p) => new PublicKey(p)),
+    );
+    unique.forEach((p, i) => {
+      result.set(p, accounts[i]?.lamports ?? 0);
+    });
+  } catch {
+    /* leave map empty; rendering falls back to "—" */
+  }
+  return result;
 }
 
 interface LandingPageProps {
@@ -54,6 +82,10 @@ export default async function LandingPage({ searchParams }: LandingPageProps) {
   const filtered = activeAgent
     ? recent.filter((m) => m.agent_slug === activeAgent)
     : recent;
+
+  const balanceByPubkey = await loadBalanceByPubkey(
+    recent.map((m) => m.agent_pubkey),
+  );
 
   const showcase = recent[0];
 
@@ -176,7 +208,12 @@ export default async function LandingPage({ searchParams }: LandingPageProps) {
               : "No memories for this agent yet."}
           </div>
         ) : (
-          <MemoryTable rows={filtered} />
+          <MemoryTable
+            rows={filtered.map((m) => ({
+              ...m,
+              balance_lamports: balanceByPubkey.get(m.agent_pubkey) ?? null,
+            }))}
+          />
         )}
       </section>
     </div>

@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, KeyRound, Hash } from "lucide-react";
+import { ArrowRight, KeyRound, Hash, Coins } from "lucide-react";
+import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { getServerSupabase, getServiceSupabase } from "@/lib/supabase/server";
+import { getRpcConnection } from "@/lib/memory/connection";
 import { listMemories } from "@/lib/memory/list";
+import { FundSingleAgentButton } from "@/components/shared/fund-single-agent-button";
 
 interface AgentRow {
   id: string;
@@ -16,6 +19,16 @@ interface AgentRow {
 
 interface AgentPageProps {
   params: Promise<{ slug: string }>;
+}
+
+async function loadBalanceLamports(pubkey: string): Promise<number | null> {
+  if (!pubkey) return null;
+  try {
+    const connection = getRpcConnection();
+    return await connection.getBalance(new PublicKey(pubkey));
+  } catch {
+    return null;
+  }
 }
 
 async function loadAgent(slug: string): Promise<AgentRow | null> {
@@ -52,6 +65,11 @@ export default async function AgentProfilePage({ params }: AgentPageProps) {
   if (!agent) notFound();
 
   const memories = await listMemories({ agentSlug: slug, limit: 50 });
+  const balanceLamports = await loadBalanceLamports(agent.owner_wallet);
+  const balanceSol =
+    balanceLamports === null ? null : balanceLamports / LAMPORTS_PER_SOL;
+  const isLow =
+    balanceSol !== null && balanceSol < 0.01;
 
   return (
     <div className="relative">
@@ -83,28 +101,46 @@ export default async function AgentProfilePage({ params }: AgentPageProps) {
                 </p>
               ) : null}
             </div>
-            <dl className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:w-auto lg:min-w-[320px]">
-              <IdentityCell
-                icon={<Hash className="h-3.5 w-3.5" />}
-                label="Onchain pubkey"
-                value={agent.owner_wallet || "—"}
-                mono
-              />
-              <IdentityCell
-                icon={<KeyRound className="h-3.5 w-3.5" />}
-                label="API key prefix"
-                value={agent.api_key_prefix ?? "—"}
-                mono
-              />
-              <IdentityCell
-                label="Memories committed"
-                value={String(memories.length)}
-              />
-              <IdentityCell
-                label="Joined"
-                value={new Date(agent.created_at).toLocaleDateString()}
-              />
-            </dl>
+            <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[320px]">
+              <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <IdentityCell
+                  icon={<Hash className="h-3.5 w-3.5" />}
+                  label="Onchain pubkey"
+                  value={agent.owner_wallet || "—"}
+                  mono
+                />
+                <IdentityCell
+                  icon={<KeyRound className="h-3.5 w-3.5" />}
+                  label="API key prefix"
+                  value={agent.api_key_prefix ?? "—"}
+                  mono
+                />
+                <IdentityCell
+                  icon={<Coins className="h-3.5 w-3.5" />}
+                  label="Wallet balance"
+                  value={
+                    balanceSol === null
+                      ? "—"
+                      : `${balanceSol.toFixed(4)} SOL${isLow ? " · low" : ""}`
+                  }
+                  tone={isLow ? "warning" : undefined}
+                />
+                <IdentityCell
+                  label="Memories committed"
+                  value={String(memories.length)}
+                />
+                <IdentityCell
+                  label="Joined"
+                  value={new Date(agent.created_at).toLocaleDateString()}
+                />
+              </dl>
+              {agent.owner_wallet ? (
+                <FundSingleAgentButton
+                  agentPubkey={agent.owner_wallet}
+                  amountSol={0.05}
+                />
+              ) : null}
+            </div>
           </div>
         </section>
 
@@ -171,12 +207,16 @@ function IdentityCell({
   value,
   mono,
   icon,
+  tone,
 }: {
   label: string;
   value: string;
   mono?: boolean;
   icon?: React.ReactNode;
+  tone?: "warning";
 }) {
+  const valueColor =
+    tone === "warning" ? "text-(--warning)" : "text-(--foreground)";
   return (
     <div className="rounded-xl border border-(--border) bg-black/20 p-3">
       <dt className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.22em] text-(--muted)">
@@ -185,7 +225,7 @@ function IdentityCell({
       </dt>
       <dd
         className={
-          "mt-1.5 break-all text-xs text-(--foreground) " +
+          `mt-1.5 break-all text-xs ${valueColor} ` +
           (mono ? "font-mono" : "")
         }
       >

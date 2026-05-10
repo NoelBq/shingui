@@ -1,29 +1,7 @@
 import { NextResponse } from "next/server";
-import { Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
+import { Keypair } from "@solana/web3.js";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { generateApiKey } from "@/lib/memory/api-key";
-import { getRpcConnection } from "@/lib/memory/connection";
-
-const AIRDROP_LAMPORTS = 0.5 * LAMPORTS_PER_SOL;
-
-async function airdropOrFlag(pubkey: PublicKey): Promise<boolean> {
-  try {
-    const connection = getRpcConnection();
-    const sig = await connection.requestAirdrop(pubkey, AIRDROP_LAMPORTS);
-    const latest = await connection.getLatestBlockhash();
-    await connection.confirmTransaction(
-      {
-        signature: sig,
-        blockhash: latest.blockhash,
-        lastValidBlockHeight: latest.lastValidBlockHeight,
-      },
-      "confirmed",
-    );
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export async function POST() {
   const sb = getServiceSupabase();
@@ -52,7 +30,6 @@ export async function POST() {
     pubkey?: string;
     api_key?: string;
     api_key_prefix?: string;
-    funding_pending?: boolean;
   }> = [];
   const skipped: string[] = [];
 
@@ -63,12 +40,10 @@ export async function POST() {
       pubkey?: string;
       api_key?: string;
       api_key_prefix?: string;
-      funding_pending?: boolean;
     } = { slug: agent.slug as string };
 
-    let newKeypair: Keypair | null = null;
     if (!agent.secret_key) {
-      newKeypair = Keypair.generate();
+      const newKeypair = Keypair.generate();
       updates.secret_key = JSON.stringify(Array.from(newKeypair.secretKey));
       updates.owner_wallet = newKeypair.publicKey.toBase58();
       provisionEntry.pubkey = updates.owner_wallet;
@@ -101,17 +76,8 @@ export async function POST() {
       );
     }
 
-    if (newKeypair) {
-      const funded = await airdropOrFlag(newKeypair.publicKey);
-      if (!funded) provisionEntry.funding_pending = true;
-    }
-
     provisioned.push(provisionEntry);
   }
-
-  const fundingPending = provisioned
-    .filter((p) => p.funding_pending && p.pubkey)
-    .map((p) => p.pubkey as string);
 
   return NextResponse.json({
     ok: true,
@@ -121,15 +87,7 @@ export async function POST() {
     skipped,
     note:
       provisioned.some((p) => p.api_key)
-        ? "api_key values are returned ONCE. Save them now."
-        : undefined,
-    funding_pending:
-      fundingPending.length > 0
-        ? {
-            pubkeys: fundingPending,
-            instructions:
-              "Devnet airdrop failed for these agents. Top up manually with `solana airdrop 0.5 <pubkey>` or `solana transfer <pubkey> 0.5 --keypair <your-funded-wallet>`.",
-          }
+        ? "api_key values are returned ONCE. Save them now. Click \"Fund agents\" in the admin toolbar to top up agent wallets from your connected wallet."
         : undefined,
   });
 }

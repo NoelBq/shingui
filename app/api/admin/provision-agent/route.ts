@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
-import { Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Keypair } from "@solana/web3.js";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { generateApiKey } from "@/lib/memory/api-key";
-import { getRpcConnection } from "@/lib/memory/connection";
-
-const AIRDROP_LAMPORTS = 0.5 * LAMPORTS_PER_SOL;
 
 interface CreateAgentBody {
   name?: string;
@@ -101,26 +98,6 @@ export async function POST(req: Request) {
     );
   }
 
-  let fundingPending = false;
-  try {
-    const connection = getRpcConnection();
-    const sig = await connection.requestAirdrop(
-      kp.publicKey,
-      AIRDROP_LAMPORTS,
-    );
-    const latest = await connection.getLatestBlockhash();
-    await connection.confirmTransaction(
-      {
-        signature: sig,
-        blockhash: latest.blockhash,
-        lastValidBlockHeight: latest.lastValidBlockHeight,
-      },
-      "confirmed",
-    );
-  } catch {
-    fundingPending = true;
-  }
-
   return NextResponse.json({
     ok: true,
     agent: {
@@ -131,12 +108,6 @@ export async function POST(req: Request) {
       api_key: apiKey.key,
       api_key_prefix: apiKey.prefix,
     },
-    funding_pending: fundingPending
-      ? {
-          pubkey: kp.publicKey.toBase58(),
-          instructions: `Devnet airdrop failed. Fund manually: \`solana airdrop 0.5 ${kp.publicKey.toBase58()}\` or \`solana transfer ${kp.publicKey.toBase58()} 0.5 --keypair <your-funded-wallet>\`.`,
-        }
-      : undefined,
     note:
       "api_key is shown ONCE. Save it now — only its sha256 is stored server-side.",
   });

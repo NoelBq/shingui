@@ -3,14 +3,24 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import {
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  SystemProgram,
+  Transaction,
+} from "@solana/web3.js";
 import {
   AlertTriangle,
   Check,
+  Coins,
   Copy,
   ExternalLink,
   Plus,
   X,
 } from "lucide-react";
+
+const FUND_LAMPORTS = 0.05 * LAMPORTS_PER_SOL;
 
 interface CreateAgentResult {
   ok: boolean;
@@ -26,6 +36,12 @@ interface CreateAgentResult {
   error?: string;
 }
 
+type FundState =
+  | { status: "idle" }
+  | { status: "pending"; message: string }
+  | { status: "success"; txSig: string }
+  | { status: "error"; message: string };
+
 function slugify(input: string): string {
   return input
     .toLowerCase()
@@ -36,9 +52,12 @@ function slugify(input: string): string {
 
 export function CreateAgentForm() {
   const router = useRouter();
+  const { publicKey, sendTransaction } = useWallet();
+  const { connection } = useConnection();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<CreateAgentResult | null>(null);
+  const [fund, setFund] = useState<FundState>({ status: "idle" });
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
@@ -54,12 +73,19 @@ export function CreateAgentForm() {
     setSlugTouched(false);
     setDescription("");
     setResult(null);
+    setFund({ status: "idle" });
     setCopiedKey(false);
     setCopiedPubkey(false);
   };
 
   return (
-    <div className="flex flex-col items-start gap-3">
+    <div
+      className={
+        open
+          ? "flex basis-full flex-col items-start gap-3"
+          : "flex flex-col items-start gap-3"
+      }
+    >
       <button
         type="button"
         onClick={() => {
@@ -101,6 +127,49 @@ export function CreateAgentForm() {
               }
               setResult(body);
               router.refresh();
+
+              if (!body.agent?.pubkey || !publicKey) {
+                setFund({
+                  status: "error",
+                  message: "agent created, but no wallet connected to fund it",
+                });
+                return;
+              }
+
+              setFund({
+                status: "pending",
+                message: "Awaiting wallet signature to fund agent…",
+              });
+              try {
+                const tx = new Transaction().add(
+                  SystemProgram.transfer({
+                    fromPubkey: publicKey,
+                    toPubkey: new PublicKey(body.agent.pubkey),
+                    lamports: FUND_LAMPORTS,
+                  }),
+                );
+                tx.feePayer = publicKey;
+                const latest = await connection.getLatestBlockhash();
+                tx.recentBlockhash = latest.blockhash;
+
+                const sig = await sendTransaction(tx, connection);
+                setFund({ status: "pending", message: "Confirming…" });
+                await connection.confirmTransaction(
+                  {
+                    signature: sig,
+                    blockhash: latest.blockhash,
+                    lastValidBlockHeight: latest.lastValidBlockHeight,
+                  },
+                  "confirmed",
+                );
+                setFund({ status: "success", txSig: sig });
+                router.refresh();
+              } catch (e) {
+                setFund({
+                  status: "error",
+                  message: e instanceof Error ? e.message : "fund failed",
+                });
+              }
             });
           }}
         >
@@ -191,6 +260,7 @@ export function CreateAgentForm() {
                 setTimeout(() => setCopiedPubkey(false), 1500);
               }}
             />
+            <FundStatusRow fund={fund} />
             <CredentialRow
               label="api key"
               value={result.agent.api_key}
@@ -305,3 +375,37 @@ function CredentialRow({
   );
 }
 
+function FundStatusRow({ fund }: { fund: FundState }) {
+  const cluster =
+    process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? "devnet";
+  return (
+    <div className="rounded-lg bg-black/40 px-3 py-2">
+      <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.22em] text-(--muted)">
+        <Coins className="h-3 w-3" />
+        funding · 0.05 SOL from your wallet
+      </div>
+      <div className="mt-1 text-xs">
+        {fund.status === "idle" ? (
+          <span className="text-(--muted)">queued…</span>
+        ) : fund.status === "pending" ? (
+          <span className="text-(--muted)">{fund.message}</span>
+        ) : fund.status === "success" ? (
+          <span className="flex items-center gap-2 text-(--accent)">
+            <Check className="h-3 w-3" />
+            funded
+            <a
+              href={`https://solscan.io/tx/${fund.txSig}?cluster=${cluster}`}
+              target="_blank"
+              rel="noreferrer"
+              className="font-mono text-[11px] underline opacity-80 hover:opacity-100"
+            >
+              view tx
+            </a>
+          </span>
+        ) : (
+          <span className="text-rose-400">{fund.message}</span>
+        )}
+      </div>
+    </div>
+  );
+}
