@@ -4,15 +4,11 @@ import { createHash, randomBytes } from "node:crypto";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 const KEY_PREFIX = "sk_shingi_";
-const KEY_RANDOM_BYTES = 24; // 24 bytes → 32 base64url chars
+const KEY_RANDOM_BYTES = 24;
 
 export interface IssuedApiKey {
-  // The plaintext key. Returned to the caller once during provisioning;
-  // never stored server-side beyond the single response.
   key: string;
-  // sha256(key) hex — what gets stored in agents.api_key_hash.
   hash: string;
-  // Short label for human-readable matching in admin UIs (first 12 chars).
   prefix: string;
 }
 
@@ -33,9 +29,6 @@ export interface ResolvedAgent {
   slug: string;
 }
 
-// Resolves a plaintext bearer token to an agent identity. Returns null if
-// the token doesn't match any agent's hash. Used by the MCP route's
-// withMcpAuth verifier.
 export async function findAgentByApiKey(
   plaintextKey: string,
 ): Promise<ResolvedAgent | null> {

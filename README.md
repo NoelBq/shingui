@@ -64,9 +64,9 @@ Admin actions (provision, reset, seed, create new agent, MCP `commit_memory`) ar
 
 When admin is enabled (`NEXT_PUBLIC_SHINGI_ADMIN_ENABLED=true`), the landing page exposes three admin buttons:
 
-1. **Provision agents** (one-time, after applying migration 0003) — generates a Solana keypair for each seeded agent and writes it to `agents.secret_key`. Idempotent.
+1. **Provision agents** — for each seeded agent missing credentials, generates a Solana keypair (`agents.secret_key`) and an MCP API key (`agents.api_key_hash` + `agents.api_key_prefix`). Idempotent at the column level — only fills in what's missing. Plaintext API keys are revealed **once** in the response panel; copy them then.
 2. **Reset memories** — wipes the `memory_events` table. Onchain commits stay; only the Postgres pointer table is cleared. Useful between demo recordings.
-3. **Seed memories** — commits 6 memory events to devnet, each signed by its own agent's keypair (admin pays fees as `feePayer`).
+3. **Seed memories** — commits 6 memory events to devnet, each signed by its own agent's keypair (admin pays fees as `feePayer`). Each row also stores `original_payload` so restore stays available.
 
 Then the verify loop:
 
@@ -74,6 +74,7 @@ Then the verify loop:
 5. Status banner shows ✅ **Verified · untouched** with the onchain block_time. The signer field shows the agent's pubkey (not the admin's).
 6. Click **Tamper this memory** — backend mutates `payload.confidence` in Postgres.
 7. Page refreshes → ❌ **Tampered · hash mismatch**, with a Solscan link to the original commit.
+8. Click **Restore this memory** — backend copies `original_payload` back into `payload`. Page flips ❌→✅ via the same View Transition. The demo stays replayable for the next visitor.
 
 ## Getting started
 
@@ -104,6 +105,9 @@ solana program deploy target/deploy/shingi.so \
 # (in your Supabase dashboard or via supabase CLI)
 psql ... -f supabase/migrations/0001_init.sql
 psql ... -f supabase/migrations/0002_memory_events.sql
+psql ... -f supabase/migrations/0003_agent_identity.sql      # adds agents.secret_key
+psql ... -f supabase/migrations/0004_agent_api_keys.sql      # adds agents.api_key_hash + prefix
+psql ... -f supabase/migrations/0005_original_payload.sql    # snapshots payload for restore
 psql ... -f supabase/seed.sql
 
 # Start the app
@@ -132,6 +136,7 @@ Copy `.env.example` to `.env.local` and fill in.
 - **Memory-hole attack:** the operator can simply delete a `memory_events` row. Pattern A doesn't fix this; v2 addresses it via mirroring or Merkle batches.
 - **Truth:** the system proves the payload hasn't been edited, not that the agent's claim was correct. The agent could have hallucinated and committed a hallucination.
 - **Operator can impersonate agents.** Each agent's secret key lives in `agents.secret_key` (service-role-only at the column-grant level). Anyone with the service-role key can read it and sign as that agent. The integrity of `memory_events` is preserved (verifier compares hash, not signer pedigree); only attribution is undermined. Production would externalize keys to HSM / Turnkey / Privy / KMS so secrets never touch the operator's database.
+- **Restore is operator-controlled.** `/api/restore/[id]` is public so visitors can replay the demo. Real applications would not expose this — it exists purely so the public demo loop stays repeatable.
 
 ## MCP server
 
@@ -165,7 +170,19 @@ claude mcp add shingi-newagent --transport http http://localhost:3000/api/mcp \
 
 The agent will sign commit_memory txs with its own keypair (admin keypair pays fees as `feePayer`). Verify any of its memories and you'll see its own pubkey in the `signer` field.
 
-### Connect from Claude Code
+### Test the MCP server
+
+Three ways to drive `POST /api/mcp` against a running `bun run dev`:
+
+**1. MCP Inspector (UI, recommended for first run)**
+
+```sh
+npx @modelcontextprotocol/inspector
+```
+
+Opens at `localhost:6274`. In the UI: transport = **Streamable HTTP**, URL = `http://localhost:3000/api/mcp`. Optionally add header `Authorization: Bearer sk_shingi_<key>` to exercise `commit_memory`. Connect → tools list appears → click a tool, fill args, run.
+
+**2. Claude Code**
 
 ```sh
 # Read-only — no auth needed
@@ -176,23 +193,39 @@ claude mcp add shingi-hayato --transport http http://localhost:3000/api/mcp \
   --header "Authorization: Bearer sk_shingi_<hayato-key>"
 ```
 
-Then in Claude Code, ask things like:
+Then ask Claude Code things like _"verify memory `<id>`"_, _"list Hayato's recent memories"_, or _"commit a memory: I just observed SOL bouncing off 158 support"_. The agent identity is whoever's API key is wired into the entry — verify the returned id with `verify_memory` and the `signer` field will be that agent's pubkey.
 
-- _"verify memory `<id>`"_
-- _"list Hayato's recent memories"_
-- _"commit a memory: I just observed SOL bouncing off 158 support"_ — the agent identity is whoever's API key is wired into the MCP entry. Verify the result with `verify_memory(returned_id)` and you'll get ok=true with the agent's pubkey as signer.
+**3. Raw curl**
+
+```sh
+# List tools
+curl -X POST http://localhost:3000/api/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+
+# Call commit_memory (auth required)
+curl -X POST http://localhost:3000/api/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H 'Authorization: Bearer sk_shingi_<key>' \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"commit_memory","arguments":{"payload":{"content":"smoke test","confidence":0.9}}}}'
+```
+
+**Smoke-test sequence** (any method): `tools/list` → 4 tools · `verify_memory` an existing id → `ok: true` · `commit_memory` without auth → `isError: true` · `commit_memory` with bearer → `{ memoryEventId, txSig }` · `verify_memory(memoryEventId)` → `ok: true` with that agent's pubkey as `signer`.
 
 ## Tests
 
 ```sh
-bun run test    # vitest: hash core + program client encode/decode + MCP schemas
-cargo test --manifest-path programs/shingi/Cargo.toml   # LiteSVM
+bun run test    # vitest: canonical-json + sha256, program-client encode/decode, MCP schemas, API-key gen/lookup
+cargo test --manifest-path programs/shingi/Cargo.toml   # LiteSVM end-to-end commit_memory
 ```
 
 ## Out of scope (v2)
 
 - SIWS / wallet-based login session
 - Pattern C Merkle batching + indexer
-- Real AI agents calling `commitMemory` directly
+- Migration to `@solana/kit` + ConnectorKit (currently on `@solana/web3.js@1.98.4` + `@solana/wallet-adapter-*`)
 - Multi-agent dispute UI
 - Reputation scoring on top of memory events
+- Externalizing agent secret keys to HSM / Turnkey / Privy / KMS

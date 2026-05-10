@@ -3,8 +3,6 @@ import { commitMemoryServer } from "@/lib/memory/commit";
 import { getRpcConnection } from "@/lib/memory/connection";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
-// Six memory events across two themed agents. Real shape would come from
-// real agents; for the demo we hand-write evocative entries.
 const MEMORIES: Array<{
   agentSlug: string;
   payload: { content: string; confidence: number; recorded_at: string };

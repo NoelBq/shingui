@@ -44,9 +44,6 @@ export function TamperButton({ memoryEventId }: { memoryEventId: string }) {
             if (body.before !== undefined) params.set("before", String(body.before));
             if (body.after !== undefined) params.set("after", String(body.after));
 
-            // Wrapping the navigation + refresh in startTransition activates
-            // the page's <ViewTransition> wrappers so the green→red flip
-            // animates instead of cutting.
             startTransition(() => {
               router.replace(`${pathname}?${params.toString()}`);
               router.refresh();

@@ -3,12 +3,6 @@ import "server-only";
 import { Keypair } from "@solana/web3.js";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
-// Loads an agent's Solana keypair from agents.secret_key.
-//
-// The column is service-role-only at the GRANT level (see migration 0003).
-// This helper uses the service-role Supabase client; do not refactor it to
-// use the anon client — the query would fail with a column-permission error
-// rather than silently leak.
 export async function loadAgentKeypair(agentId: string): Promise<Keypair> {
   const sb = getServiceSupabase();
   if (!sb) {

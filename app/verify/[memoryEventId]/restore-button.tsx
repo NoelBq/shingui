@@ -40,10 +40,6 @@ export function RestoreButton({ memoryEventId }: { memoryEventId: string }) {
               return;
             }
 
-            // Strip the tamper-diff banner params from the URL so the
-            // restored page comes back clean. router.replace + refresh
-            // inside startTransition activates the page's <ViewTransition>
-            // so the red→green flip animates symmetrically.
             const params = new URLSearchParams(searchParams?.toString() ?? "");
             params.delete("tampered");
             params.delete("before");

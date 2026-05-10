@@ -16,21 +16,6 @@ import {
 } from "@/lib/memory/mcp-tools";
 import { findAgentByApiKey } from "@/lib/memory/api-key";
 
-// Shingi MCP server.
-//
-// Endpoint: POST /api/mcp (streamable HTTP transport).
-// Auth: optional. Read tools (verify, list, get) work anonymously. The
-// commit_memory write tool requires Authorization: Bearer sk_shingi_<key>;
-// the bearer is resolved to an agent identity and that agent's keypair
-// signs the on-chain tx (admin keypair pays fees).
-//
-// Connect from Claude Code (read-only):
-//   claude mcp add shingi --transport http http://localhost:3000/api/mcp
-//
-// Connect with an agent's API key (read + commit):
-//   claude mcp add shingi --transport http http://localhost:3000/api/mcp \
-//     --header "Authorization: Bearer sk_shingi_<key>"
-
 const baseHandler = createMcpHandler(
   (server) => {
     server.tool(
@@ -134,9 +119,6 @@ const baseHandler = createMcpHandler(
   },
 );
 
-// Auth wrapper: optional bearer. Anonymous requests still hit the server
-// (so read tools work), but extra.authInfo will be undefined — the
-// commit_memory handler checks for it.
 const handler = withMcpAuth(
   baseHandler,
   async (_req, bearerToken) => {

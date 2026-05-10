@@ -19,9 +19,6 @@ interface AgentPageProps {
 }
 
 async function loadAgent(slug: string): Promise<AgentRow | null> {
-  // api_key_prefix is service-role-only at the column-grant level; use the
-  // service client when available so the prefix shows up. Profile page is
-  // public-readable but the prefix is a UX nicety, not a secret.
   const sb = getServiceSupabase() ?? getServerSupabase();
   if (!sb) return null;
   const select = getServiceSupabase()

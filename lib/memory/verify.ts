@@ -9,22 +9,14 @@ import { getRpcConnection } from "./connection";
 import { getServerSupabase, getServiceSupabase } from "@/lib/supabase/server";
 import type { MemoryEvent, VerifyResult } from "@/types";
 
-// Threshold above which we flag the agent's self-reported `recorded_at`
-// as suspiciously divergent from consensus block_time. Hackathon default;
-// real systems should pick this based on expected commit latency.
+// Flag self-reported `recorded_at` as suspicious when it diverges from
+// onchain block_time by more than this threshold.
 const TIMESTAMP_DIVERGENCE_THRESHOLD_SECONDS = 60;
 
 export interface VerifyMemoryRow extends VerifyResult {
   event: MemoryEvent;
 }
 
-// Recomputes the hash from the payload as it currently exists in
-// Postgres, fetches the onchain tx, decodes the committed hash from the
-// instruction data, and returns the comparison result.
-//
-// The point of recomputing every time: the operator can mutate `payload`
-// in Postgres at will. A stored hash would just be another mutable field.
-// Trusting the onchain tx is the entire security claim.
 export async function verifyMemory(
   memoryEventId: string,
 ): Promise<VerifyMemoryRow | null> {
@@ -66,9 +58,6 @@ export async function verifyMemory(
     blockTime = decoded.blockTime;
     signer = decoded.signer?.toBase58() ?? null;
   } catch (e) {
-    // We still return a VerifyResult — but `ok` will be false because
-    // onchainHash is null. The page surfaces the underlying error so a
-    // verifier can tell "RPC down" apart from "tampered".
     return {
       event,
       ok: false,
@@ -78,8 +67,6 @@ export async function verifyMemory(
       signer: null,
       txSig: event.solana_tx_sig,
       timestampDivergenceSeconds: null,
-      // Stash the error message in the type's index signature; the page
-      // can surface it without changing the public shape.
       ...({
         rpcError:
           e instanceof Error ? e.message : "unknown error fetching tx",
@@ -113,11 +100,8 @@ export async function verifyMemory(
   };
 }
 
-// Sanity helper for the landing-page UI: links to a Solana explorer
-// without coupling the rest of the codebase to a specific explorer.
 export function explorerTxUrl(txSig: string): string {
   const cluster = (process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? "devnet").toLowerCase();
-  // Solscan accepts ?cluster=devnet for non-mainnet.
   const base = `https://solscan.io/tx/${txSig}`;
   return cluster === "mainnet" || cluster === "mainnet-beta"
     ? base

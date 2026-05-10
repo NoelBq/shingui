@@ -1,13 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
-// Demo-only: mutates `payload.confidence` for a given memory event.
-// The whole point is to trigger a verify mismatch — the next call to
-// verifyMemory(id) recomputes the hash of the mutated payload and finds
-// it no longer matches the onchain commit.
-//
-// In any real deployment this route would not exist. It is the operator
-// performing the exact attack the system is designed to detect.
 export async function POST(
   _req: Request,
   { params }: { params: Promise<{ memoryEventId: string }> },
@@ -36,7 +29,6 @@ export async function POST(
   const payload = row.payload as Record<string, unknown>;
   const before =
     typeof payload.confidence === "number" ? (payload.confidence as number) : 0.5;
-  // Nudge by an amount that's clearly intentional (not floating-point noise).
   const after = Number((before + 0.13).toFixed(4));
   const mutated = { ...payload, confidence: after };
 

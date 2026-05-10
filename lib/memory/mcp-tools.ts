@@ -6,10 +6,6 @@ import { commitMemoryServer } from "./commit";
 import { getRpcConnection } from "./connection";
 import type { MemoryPayload } from "@/types";
 
-// Tool handler outputs are JSON-serialized into a `text` content block by
-// the route layer. Returning plain objects keeps these handlers easy to
-// reuse outside MCP if we ever want to.
-
 export async function verifyMemoryTool(input: { memory_event_id: string }) {
   const result = await verifyMemory(input.memory_event_id);
   if (!result) {
@@ -49,11 +45,6 @@ export async function getMemoryTool(input: { memory_event_id: string }) {
   return item;
 }
 
-// Authenticated. The MCP route's auth wrapper resolves a bearer API key to
-// an agent_id and passes it here. The agent's keypair (loaded server-side
-// from agents.secret_key) signs the commit_memory tx; the admin keypair
-// pays the fee. The result includes the new memory_event_id and tx_sig so
-// the caller can immediately verify_memory(memory_event_id) if desired.
 export async function commitMemoryTool(input: {
   agentId: string;
   payload: Record<string, unknown>;

@@ -1,10 +1,4 @@
-// Shingi program client.
-//
-// Deliberately handwritten (no IDL dep, no @coral-xyz/anchor in JS) — the
-// instruction is 72 bytes of fixed layout and the discriminator is
-// precomputed. Keeps the bundle small and the encoding inspectable.
-//
-// Layout of commit_memory instruction data (72 bytes total):
+// commit_memory instruction data layout (72 bytes):
 //   bytes  0..7   discriminator = sha256("global:commit_memory")[0..8]
 //   bytes  8..39  agent: Pubkey (32 raw bytes)
 //   bytes 40..71  hash:  [u8; 32]
@@ -73,9 +67,6 @@ export function decodeCommitMemoryIxData(
   };
 }
 
-// Pulls the commit_memory instruction's decoded data out of a confirmed
-// transaction. We only ever expect one such instruction per tx, so we
-// return the first match. Throws if none present.
 export async function decodeCommitMemoryFromTx(
   connection: Connection,
   txSig: string,
@@ -94,10 +85,6 @@ export async function decodeCommitMemoryFromTx(
     );
   }
 
-  // The v1.98 message can be either legacy `Message` or `MessageV0`, with
-  // different property names for the same data. Treat them uniformly via
-  // a structural cast so we don't have to care which Solana web3.js
-  // version emitted the transaction.
   type MessageShape = {
     accountKeys?: PublicKey[];
     staticAccountKeys?: PublicKey[];
@@ -126,7 +113,6 @@ export async function decodeCommitMemoryFromTx(
         : Uint8Array.from(decodeBase58(ix.data as string));
     const decoded = decodeCommitMemoryIxData(raw);
 
-    // First account in our instruction is the signer.
     const accountIndexes =
       "accountKeyIndexes" in ix
         ? (ix as { accountKeyIndexes: number[] }).accountKeyIndexes
@@ -146,8 +132,6 @@ export async function decodeCommitMemoryFromTx(
   );
 }
 
-// Solana web3.js v1 represents legacy-tx instruction data as base58. Helper
-// so we don't pull bs58 just for verifier reads.
 function decodeBase58(str: string): number[] {
   const ALPHABET =
     "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";

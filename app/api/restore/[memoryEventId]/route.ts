@@ -1,17 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
-// Public route. Resets memory_events.payload back to the original_payload
-// snapshot taken at commit time. The onchain commit is untouched (it's
-// immutable anyway) — restoring just makes the live payload re-hash to the
-// committed value, so the next verify returns ok=true.
-//
-// Idempotent: if payload already equals original_payload, the route returns
-// no_op=true without touching the row.
-//
-// Why this exists: tamper mutates Postgres permanently. Without restore,
-// once any visitor tampers a memory, every subsequent visitor sees red.
-// With restore, the demo is replayable.
 export async function POST(
   _req: Request,
   { params }: { params: Promise<{ memoryEventId: string }> },
@@ -46,7 +35,6 @@ export async function POST(
     );
   }
 
-  // Idempotency: a deep-equal check via stable stringification.
   const currentJson = JSON.stringify(data.payload);
   const originalJson = JSON.stringify(data.original_payload);
   if (currentJson === originalJson) {

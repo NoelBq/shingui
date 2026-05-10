@@ -3,18 +3,6 @@ import { Keypair } from "@solana/web3.js";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { generateApiKey } from "@/lib/memory/api-key";
 
-// Provisions any missing per-agent assets:
-//   - secret_key (Solana keypair)
-//   - api_key_hash + api_key_prefix (MCP commit_memory bearer auth)
-//
-// Both are independently idempotent: an agent that already has secret_key
-// but no api_key_hash will get just the API key issued, and vice versa.
-//
-// The plaintext API keys are returned **once** in the response. They are
-// not retrievable later — only their sha256 lives in the database. If a
-// key is lost, drop+re-provision (or rotate, when that route lands in v2).
-//
-// One-shot admin op. Hit once after applying migration 0003 + 0004.
 export async function POST() {
   const sb = getServiceSupabase();
   if (!sb) {
@@ -65,7 +53,7 @@ export async function POST() {
       const issued = generateApiKey();
       updates.api_key_hash = issued.hash;
       updates.api_key_prefix = issued.prefix;
-      provisionEntry.api_key = issued.key; // returned once
+      provisionEntry.api_key = issued.key;
       provisionEntry.api_key_prefix = issued.prefix;
     }
 

@@ -1,7 +1,3 @@
-// MCP tool input schemas. Lives in its own module (no `server-only`) so
-// vitest can import them — the tool *handlers* stay in mcp-tools.ts where
-// they belong (server-only because they hit Supabase + the verify SDK).
-
 import { z } from "zod";
 
 export const verifyMemorySchema = {

@@ -1,23 +1,5 @@
-// Canonical JSON serialization + sha256 hashing.
-//
-// Two payloads that differ only in object key order or whitespace must
-// produce the same hash. Without this, a verifier comparing
-// sha256(JSON.stringify(currentPayload)) against the committed hash
-// would flag false tampers from any non-deterministic re-serialization
-// (e.g. JS engines preserving insertion order, Postgres jsonb returning
-// keys in storage order rather than insertion order, etc.).
-//
-// Subset rules:
-//   - object keys sorted lexicographically (UTF-16 code unit order, what
-//     Array.prototype.sort uses by default)
-//   - no whitespace
-//   - non-finite numbers (NaN/Infinity) throw — JSON cannot represent them
-//   - undefined values throw — JSON has no undefined
-//   - arrays preserve order (order IS semantically meaningful)
-//   - strings use the standard JSON.stringify escaping
-//
-// Anything outside JSON's value model (functions, symbols, Map, Set,
-// BigInt, Date) throws. Convert to plain JSON before hashing.
+// Canonical JSON: object keys sorted, no whitespace, arrays preserve order.
+// Ensures sha256(canonicalJson(payload)) is stable across re-serialization.
 
 export function canonicalJson(value: unknown): string {
   if (value === null) return "null";
@@ -51,9 +33,6 @@ export function canonicalJson(value: unknown): string {
 export async function hashPayloadBytes(payload: unknown): Promise<Uint8Array> {
   const canonical = canonicalJson(payload);
   const bytes = new TextEncoder().encode(canonical);
-  // TextEncoder always allocates a fresh ArrayBuffer (never SharedArrayBuffer),
-  // so the cast is sound. Strict TS otherwise rejects ArrayBufferLike for
-  // the BufferSource argument.
   const digest = await crypto.subtle.digest(
     "SHA-256",
     bytes.buffer as ArrayBuffer,

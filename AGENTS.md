@@ -1,13 +1,13 @@
 <claude-mem-context>
 # Memory Context
 
-# [shingi] recent context, 2026-05-09 10:14pm GMT-3
+# [shingi] recent context, 2026-05-09 11:25pm GMT-3
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 26 obs (8,578t read) | 174,615t work | 95% savings
+Stats: 38 obs (14,069t read) | 267,495t work | 95% savings
 
 ### May 9, 2026
 370 8:01p 🔵 Seed memories endpoint commits trading agent memories to Solana
@@ -35,25 +35,37 @@ Stats: 26 obs (8,578t read) | 174,615t work | 95% savings
 392 " 🟣 ConfBar component created: inline confidence indicator
 393 " 🟣 MemoryTable component created: data table for recent memories
 394 8:24p ✅ Landing page redesigned: hero with verification card + memory table with agent filtering
-S157 Determine the best approach for API documentation within the hackathon timeframe and how it impacts the pitch narrative (May 9 at 9:43 PM)
-S158 Analyze database schema impact and security risks of adding a public API to the Shingi memory system (May 9 at 9:45 PM)
 395 9:45p 🔵 Existing commitMemoryServer function is reusable for API implementation
-S159 Identify concrete security attack vectors against the API with exploitation examples and mitigation costs (May 9 at 9:46 PM)
-S160 Review and evaluate Shingi project scope to confirm it's the right architectural approach for addressing integration gaps (May 9 at 9:48 PM)
-S161 Architectural decision: custodial vs client-signed API models—which pattern better serves integration story and hackathon demo (May 9 at 9:49 PM)
-S162 Determine optimal deployment architecture for the API—separate service vs integrated with existing Next.js app (May 9 at 9:50 PM)
-S163 Financial risk analysis of token leak scenarios across API models and blockchain networks (May 9 at 9:51 PM)
-S164 Input validation strategy comparison—individual guards vs consolidated schema-based approach for API payload protection (May 9 at 9:52 PM)
-S165 Clarifying MCP approach for Shingi: Understanding how Model Context Protocol integrates with Solana-based agent memory integrity verification (May 9 at 9:53 PM)
-S166 Architectural pivot evaluation—REST API vs MCP (Model Context Protocol) as primary integration surface for Shingi (May 9 at 9:55 PM)
-**Investigated**: MCP protocol capabilities and agent-native patterns; stdio vs HTTP MCP deployment modes; local wallet access implications for client-signed transactions; Claude Desktop MCP support status and maturity; demo experience comparison (UI clicking vs live agent tool invocation); threat model differences between remote (REST) and local (MCP) services
+S166 Architectural pivot evaluation—REST API vs MCP (Model Context Protocol) as primary integration surface for Shingi (May 9 at 9:54 PM)
+S167 Evaluate MCP (Model Context Protocol) server as integration surface for Shingi; determine architecture priority and implementation approach (May 9 at 9:55 PM)
+S168 Finalize MCP integration strategy + explore project structure and existing brand/design assets (May 9 at 10:14 PM)
+S169 Enhance README.md documentation for the Shingi hackathon project with improved branding, visual hierarchy, and at-a-glance project understanding (May 9 at 10:14 PM)
+396 10:14p 🔵 Design handoff document reviewed: comprehensive brand mark + UI refresh specification
+397 10:15p 🔵 GraphMark component implementation specification extracted from design prototype
+398 10:17p 🟣 README banner SVG created and README redesigned with new brand identity
+S170 Generate minimal project description for Shingi based on codebase exploration (May 9 at 11:12 PM)
+399 11:16p 🔵 Shingi project structure and architecture discovered
+S171 Update Shingi project documentation to reflect complete implementation: add missing migration steps, document MCP testing methods, and clarify demo flow with API keys and restore functionality (May 9 at 11:17 PM)
+400 11:18p 🔵 Documentation structure audit
+401 11:19p 🔵 Existing documentation inventory
+402 " ✅ Updated README setup instructions with missing migrations
+403 11:20p ✅ Expanded demo flow section with API keys and restore functionality
+404 " ✅ Added restore-endpoint limitation to known limitations section
+405 " ✅ Added comprehensive "How to test the MCP server" documentation
+406 " ✅ Expanded test section with granular coverage details
+407 " ✅ Updated out-of-scope list with dependency migration and key externalization
+S172 Clarify how to test the MCP server on Vercel (production) vs. local development, including environment variable setup and deployment gotchas (May 9 at 11:21 PM)
+S173 Refine minimal project description for Shingi emphasizing MCP integration and agent capabilities (May 9 at 11:22 PM)
+S174 Audit git commit history and contributor composition on main branch (May 9 at 11:22 PM)
+S175 Plan clean repository creation strategy to remove Teh SoTo's commit history from Shingi (May 9 at 11:24 PM)
+**Investigated**: Git archive method for snapshot extraction; fresh repository initialization approaches; distinction between removing commit history vs. removing code contributions; impact of the 3 Teh SoTo commits on current codebase
 
-**Learned**: MCP is fundamentally more on-brand for "tamper-proof memory for AI agents" than REST—agents configure one line and get native memory tools. Demo beat is decisively stronger with MCP: live Claude Desktop showing agent calling `commit_memory`, seeing tx fire onchain, then calling `verify_memory` and catching tampering in real-time—far more compelling than human clicking UI. Stdio MCP (recommended over HTTP for hackathon) runs locally as subprocess with natural access to user's wallet and RPC, pairs perfectly with client-signed Model C (user's own wallet signs txs). Can eliminate entire bearer-token/rate-limit/DoS guard complexity—stdio is local-only, single-user per instance. Time cost similar (~3 hr vs ~2.5 hr REST) but scope is tighter and story sharper.
+**Learned**: Two distinct cleanup goals exist: (1) Remove commit history only—leaves code from those commits in place; (2) Remove both history and code—requires identifying and removing changes introduced by commits f2476af (dependency updates), 1ae2f64 (Shingi program), 01df8bc (agent management features). The git archive + fresh init approach yields a single clean commit by NoelBq but preserves all current functionality. Code cleanup would require targeted removals and carries risk of breaking features that depend on Teh SoTo's contributions (particularly the core Solana program)
 
-**Completed**: Full architectural comparison completed (REST vs MCP with concrete tool/resource definitions); deployment mode analysis (stdio vs HTTP); demo experience evaluation; threat model reassessment for MCP; revised scope defined with items to keep/drop; recommendation issued (MCP-primary pivot)
+**Completed**: Provided safe fresh-repo creation script using git archive and fresh init; identified the 3 commits that would need analysis for code removal; clarified the trade-off between history-only clean vs. full code/history clean
 
-**Next Steps**: Awaiting user confirmation on MCP pivot. If confirmed, Claude will write propose-first plan for MCP-primary architecture: MCP server (stdio, three tools + two resources) + slim public `/api/verify/[id]` endpoint + docs page (rewritten around MCP install) + Claude Desktop example config. Total scope ~3–3.5 hr
+**Next Steps**: User must decide between two paths: (1) Accept fresh commit history with existing code (includes Shingi program and agent features), or (2) Map exactly what the 3 commits added and remove those code changes before creating the new repo. Session awaiting user decision on cleanup scope before proceeding to implementation
 
 
-Access 175k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 267k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

@@ -1,8 +1,5 @@
 import { Connection, Keypair } from "@solana/web3.js";
 
-// Server-side first (private endpoint), then public (browser-safe), then
-// devnet default. NEXT_PUBLIC_* is intentionally readable on both sides
-// so the wallet adapter and the server route hit the same cluster.
 export function getRpcUrl(): string {
   return (
     process.env.SOLANA_RPC_URL ??
@@ -15,9 +12,6 @@ export function getRpcConnection(): Connection {
   return new Connection(getRpcUrl(), "confirmed");
 }
 
-// Loads the admin keypair from SHINGI_ADMIN_KEYPAIR. Format is the
-// JSON-array-of-bytes that `solana-keygen new` emits. This signs the
-// commit_memory transactions emitted by the seed-memories admin route.
 export function loadAdminKeypair(): Keypair {
   const raw = process.env.SHINGI_ADMIN_KEYPAIR;
   if (!raw) {

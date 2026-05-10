@@ -3,9 +3,6 @@ import "server-only";
 import { getServerSupabase, getServiceSupabase } from "@/lib/supabase/server";
 import type { MemoryEvent } from "@/types";
 
-// Memory event enriched with the agent's identity (name, slug, pubkey).
-// `agent_pubkey` reads `agents.owner_wallet`, which after migration 0003 +
-// /api/admin/provision-seeds stores the agent's own onchain pubkey.
 export interface MemoryEventWithAgent {
   id: string;
   agent_id: string;
@@ -24,9 +21,6 @@ export async function listMemories(params: {
   const sb = getServerSupabase() ?? getServiceSupabase();
   if (!sb) return [];
 
-  // `!inner` makes the relationship a real inner join so the slug filter
-  // narrows rows. Without it the filter is applied post-join and returns
-  // all memory_events with `agents = null`.
   const relation = params.agentSlug ? "agents!inner" : "agents";
   const select = `id, agent_id, payload, solana_tx_sig, created_at, ${relation}(name, slug, owner_wallet)`;
 
@@ -42,9 +36,6 @@ export async function listMemories(params: {
   if (error || !data) return [];
 
   return data.map((row) => {
-    // Supabase's typed query result for dynamic select strings is
-    // GenericStringError; we know the runtime shape and cast through
-    // unknown (the recommended TS escape hatch).
     const r = row as unknown as {
       id: string;
       agent_id: string;

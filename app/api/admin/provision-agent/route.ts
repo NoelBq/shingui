@@ -17,18 +17,6 @@ function slugify(input: string): string {
     .slice(0, 60);
 }
 
-// Creates a brand-new agent in one shot:
-//   - validate name + slug (auto-derive slug from name if absent)
-//   - generate Solana keypair (sets owner_wallet to its pubkey)
-//   - generate MCP API key (stores hash + prefix; returns plaintext once)
-//   - insert agents row
-//
-// Returns the plaintext API key in the response. Save it immediately —
-// only the sha256 lives in the database.
-//
-// No server-side admin auth in this slice (matches the existing /api/admin/*
-// routes; hackathon scope on devnet). The route is gated by
-// NEXT_PUBLIC_SHINGI_ADMIN_ENABLED in the UI only.
 export async function POST(req: Request) {
   const sb = getServiceSupabase();
   if (!sb) {
@@ -72,7 +60,6 @@ export async function POST(req: Request) {
     );
   }
 
-  // Slug uniqueness — DB has a unique constraint, but a friendlier error.
   const { data: existing, error: lookupErr } = await sb
     .from("agents")
     .select("id")
@@ -118,7 +105,7 @@ export async function POST(req: Request) {
       name: data.name as string,
       slug: data.slug as string,
       pubkey: kp.publicKey.toBase58(),
-      api_key: apiKey.key, // plaintext, returned ONCE
+      api_key: apiKey.key,
       api_key_prefix: apiKey.prefix,
     },
     note:
